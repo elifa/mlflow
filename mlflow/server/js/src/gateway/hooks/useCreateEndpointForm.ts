@@ -15,12 +15,13 @@ import { telemetryClient } from '../../telemetry/TelemetryClient';
 
 export const CODING_AGENT_TAG_KEY = 'mlflow.endpoint.agent';
 
-export const VALID_CODING_AGENTS: CodingAgentType[] = ['claude-code', 'codex', 'gemini-cli'];
+export const VALID_CODING_AGENTS: CodingAgentType[] = ['claude-code', 'codex', 'gemini-cli', 'github-copilot'];
 
 export const CODING_AGENT_LABELS: Record<CodingAgentType, string> = {
   'claude-code': 'Claude Code',
   codex: 'OpenAI Codex',
   'gemini-cli': 'Gemini CLI',
+  'github-copilot': 'GitHub Copilot',
 };
 
 /**
@@ -31,6 +32,7 @@ const CODING_AGENT_CONFIG: Record<CodingAgentType, { provider: string; model: st
   'claude-code': { provider: 'anthropic', model: 'claude-sonnet-4-6', endpointName: 'claude-code' },
   codex: { provider: 'openai', model: 'codex', endpointName: 'codex' },
   'gemini-cli': { provider: 'gemini', model: 'gemini-2.5-pro', endpointName: 'gemini-cli' },
+  'github-copilot': { provider: 'github-copilot', model: 'github', endpointName: 'github-copilot' },
 };
 
 export interface CreateEndpointFormData {
