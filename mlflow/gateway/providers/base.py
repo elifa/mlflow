@@ -61,15 +61,31 @@ PASSTHROUGH_ROUTES = {
 # - Claude Code sends:  claude-cli/<version> (external, cli)
 # - OpenAI Codex sends: codex-tui/<version>, codex_cli_rs/<version>, etc. (prefix: "codex")
 # - Gemini CLI sends:   GeminiCLI/<version>/<model> (<platform>; <arch>)
+# - GitHub Copilot CLI sends:
+#     copilot-linux-x64/1.0.75 (linux v24.18.0) term/vscode
+#   i.e. copilot-<platform>-<arch>/<version> (<os> <node_version>) term/<terminal>, where
+#   <platform>-<arch> is one of the CLI's published binary targets.
 #
 # Security note: User-Agent strings are not cryptographically verified, so any HTTP
 # client can claim these prefixes. However, the client must still supply valid upstream
 # credentials for the API call to succeed — bypassing the server key only matters when
 # the client already holds its own valid credentials (e.g., a personal subscription
-# account). Admins who need to enforce server-side key usage exclusively (for billing
-# attribution or rate limiting) should leave the endpoint's auth unconfigured or
-# restrict network-level access to trusted clients.
-_USER_CREDENTIAL_AGENTS = ("claude-cli", "codex", "geminicli")
+# account). Copilot's forwarded bearer token is short-lived (~1h), which further limits
+# the impact of User-Agent spoofing. Admins who need to enforce server-side key usage
+# exclusively (for billing attribution or rate limiting) should leave the endpoint's auth
+# unconfigured or restrict network-level access to trusted clients.
+_USER_CREDENTIAL_AGENTS = (
+    "claude-cli",
+    "codex",
+    "geminicli",
+    # Matches every Copilot CLI build target, e.g. copilot-linux-x64, copilot-darwin-arm64.
+    # A prefix keeps new platform targets working without a code change; matching too widely
+    # only means the client's own token is used instead of the server key, which is the safe
+    # direction.
+    "copilot-",
+    # VS Code's built-in Copilot Chat, e.g. GitHubCopilotChat/0.32.1
+    "githubcopilotchat",
+)
 
 # Auth header names that subscription-based CLI tools may include.
 _CLIENT_AUTH_HEADERS = ("authorization", "x-api-key", "x-goog-api-key", "api-key")

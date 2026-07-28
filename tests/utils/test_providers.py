@@ -266,6 +266,26 @@ def test_get_provider_config_vertex_ai_has_default_chain():
     assert project_field["required"] is True
 
 
+def test_get_provider_config_github_copilot_requires_no_credentials():
+    config = get_provider_config_response("github-copilot")
+    assert config["default_mode"] == "end_user_credentials"
+
+    mode = next(m for m in config["auth_modes"] if m["mode"] == "end_user_credentials")
+    # Callers authenticate with their own Copilot subscription, so the UI must let an
+    # endpoint be created without entering a key.
+    assert all(not f["required"] for f in mode["secret_fields"])
+    assert all(not f["required"] for f in mode["config_fields"])
+    assert {f["name"] for f in mode["secret_fields"]} == {"api_key"}
+    assert {f["name"] for f in mode["config_fields"]} == {"api_base"}
+
+
+def test_github_copilot_is_absent_from_the_generic_provider_list():
+    # Our provider has no model catalog file, so it never reaches the generic picker.
+    assert "github-copilot" not in get_all_providers()
+    # It stays configurable, so the coding-agent quick start keeps working.
+    assert get_provider_config_response("github-copilot")["default_mode"] == "end_user_credentials"
+
+
 _MOCK_PROVIDER_DATA = {
     "test_provider": {
         "test-model": {
