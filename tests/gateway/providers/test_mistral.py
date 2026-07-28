@@ -16,7 +16,7 @@ from tests.gateway.tools import MockAsyncResponse, MockAsyncStreamingResponse, m
 
 TEST_STRING = "This is a test"
 CONTENT_TYPE = "application/json"
-TARGET = "aiohttp.ClientSession.post"
+TARGET = "aiohttp.ClientSession.request"
 
 
 def completions_config():
@@ -88,6 +88,7 @@ async def test_completions():
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.mistral.ai/v1/chat/completions",
             json={
                 "messages": [{"role": "user", "content": TEST_STRING}],
@@ -427,7 +428,8 @@ async def _run_test_chat_stream(resp, provider):
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("Authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.mistral.ai/v1/chat/completions",
             json={
                 "model": "mistral-large-latest",

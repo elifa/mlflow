@@ -63,7 +63,8 @@ async def test_completions():
             "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
         }
         mock_build_client.assert_called_once()
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "http://127.0.0.1:5000/invocations",
             json={
                 "inputs": ["Is this a test?"],
@@ -201,7 +202,8 @@ async def test_embeddings():
             "usage": {"prompt_tokens": None, "total_tokens": None},
         }
         mock_build_client.assert_called_once()
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "http://127.0.0.1:2000/invocations",
             json={"inputs": ["test1", "test2"]},
             timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -284,7 +286,8 @@ async def test_chat():
             },
         }
         mock_build_client.assert_called_once()
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "http://127.0.0.1:4000/invocations",
             json={
                 "inputs": ["Is this a test?"],

@@ -751,6 +751,7 @@ class GeminiProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=path,
             payload=payload,
         )
@@ -809,7 +810,11 @@ class GeminiProvider(BaseProvider):
 
         # Documentation: https://ai.google.dev/api/generate-content#method:-models.streamgeneratecontent
         sse = send_stream_request(
-            headers=self.headers, base_url=self.base_url, path=path, payload=model_payload
+            headers=self.headers,
+            base_url=self.base_url,
+            method="POST",
+            path=path,
+            payload=model_payload,
         )
 
         async for raw in handle_incomplete_chunks(sse):
@@ -852,6 +857,7 @@ class GeminiProvider(BaseProvider):
         sse = send_stream_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=f"{self.config.model.name}:streamGenerateContent?alt=sse",
             payload=body,
         )
@@ -938,11 +944,15 @@ class GeminiProvider(BaseProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         # base_url includes /v1beta/models; the caller's path already starts with
         # v1beta/models/..., so use the bare origin to avoid double-prefixing.
         api_origin = "https://generativelanguage.googleapis.com"
-        gen = send_proxy_request(self._get_headers(None, headers), api_origin, path, payload)
+        gen = send_proxy_request(
+            self._get_headers(None, headers), api_origin, method, path, payload
+        )
         meta = await gen.__anext__()
         if meta["is_streaming"]:
             return gen
@@ -967,6 +977,7 @@ class GeminiProvider(BaseProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )
@@ -975,6 +986,7 @@ class GeminiProvider(BaseProvider):
             return await send_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )

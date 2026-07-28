@@ -1479,7 +1479,9 @@ async def gemini_passthrough_stream_generate_content(endpoint_name: str, request
     )
 
 
-@gateway_router.post("/proxy/{endpoint_name}/{path:path}", response_model=None)
+@gateway_router.api_route(
+    "/proxy/{endpoint_name}/{path:path}", methods=["GET", "POST"], response_model=None
+)
 @translate_http_exception
 @_record_gateway_invocation(GatewayInvocationType.RAW_PROXY)
 async def raw_proxy(endpoint_name: str, path: str, request: Request):
@@ -1490,6 +1492,10 @@ async def raw_proxy(endpoint_name: str, path: str, request: Request):
     <provider_base_url>/<path>, using the credentials configured for the named
     endpoint. Unlike the typed passthrough routes, the ``model`` field in the
     payload is NOT replaced with the value from the endpoint config.
+
+    Both GET and POST are supported. GET requests carry no body and are forwarded
+    body-less to the provider; coding agents such as the GitHub Copilot CLI issue
+    ``GET <endpoint>/models`` during startup discovery.
 
     Streaming is detected automatically from the response Content-Type
     (``text/event-stream`` or ``application/x-ndjson``), so this endpoint
@@ -1503,7 +1509,8 @@ async def raw_proxy(endpoint_name: str, path: str, request: Request):
             "messages": [{"role": "user", "content": "Hello"}]
         }
     """
-    body = await _get_request_body(request)
+    method = request.method.upper()
+    body = {} if method == "GET" else await _get_request_body(request)
     user_metadata = _get_user_metadata(request)
     store = _get_store()
     workspace = get_request_workspace()
@@ -1539,7 +1546,7 @@ async def raw_proxy(endpoint_name: str, path: str, request: Request):
         except GuardrailViolation as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-        result = await provider.proxy(path, body, headers)
+        result = await provider.proxy(path, body, headers, method=method)
 
         if isinstance(result, AsyncIterable):
             # Post-LLM guardrails are not applied to streaming responses.

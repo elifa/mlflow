@@ -333,6 +333,7 @@ class TogetherAIProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=path,
             payload=payload,
         )
@@ -341,6 +342,7 @@ class TogetherAIProvider(BaseProvider):
         return send_stream_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=path,
             payload=payload,
         )

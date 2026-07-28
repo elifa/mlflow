@@ -49,6 +49,7 @@ class AI21LabsProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="complete",
             payload=payload,
         )

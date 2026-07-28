@@ -31,6 +31,7 @@ class HFTextGenerationInferenceServerProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.huggingface_config.hf_server_url,
+            method="POST",
             path=path,
             payload=payload,
         )

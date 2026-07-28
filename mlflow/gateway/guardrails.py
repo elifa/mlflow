@@ -272,7 +272,7 @@ class JudgeGuardrail(Guardrail):
 
             try:
                 resp_json = await send_request(
-                    headers=headers, base_url=url, path=path, payload=body
+                    headers=headers, base_url=url, method="POST", path=path, payload=body
                 )
             except HTTPException as e:
                 raise GuardrailViolation(

@@ -122,7 +122,8 @@ async def _run_test_chat(provider):
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/chat/completions",
             json={
                 "model": "gpt-4o-mini",
@@ -277,7 +278,8 @@ async def _run_test_chat_stream(resp, provider):
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/chat/completions",
             json={
                 "model": "gpt-4o-mini",
@@ -444,7 +446,8 @@ async def _run_test_completions(resp, provider):
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
         assert call_headers.get("OpenAI-Organization") == "test-organization"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/completions",
             json={
                 "model": "gpt-4-32k",
@@ -565,7 +568,8 @@ async def _run_test_completions_stream(resp, provider):
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
         assert call_headers.get("OpenAI-Organization") == "test-organization"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/completions",
             json={
                 "model": "gpt-4-32k",
@@ -644,7 +648,8 @@ async def _run_test_embeddings(provider):
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/embeddings",
             json={"model": "text-embedding-ada-002", "input": "This is a test"},
             timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -721,7 +726,8 @@ async def test_embeddings_batch_input():
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.openai.com/v1/embeddings",
             json={
                 "model": "text-embedding-ada-002",
@@ -772,7 +778,8 @@ async def test_azure_openai():
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("api-key") == "key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             (
                 "https://test-azureopenai.openai.azure.com/openai/deployments/test-gpt35"
                 "/completions?api-version=2023-05-15"
@@ -808,7 +815,8 @@ async def test_azuread_openai():
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             (
                 "https://test-azureopenai.openai.azure.com/openai/deployments/test-gpt35"
                 "/completions?api-version=2023-05-15"
@@ -1414,12 +1422,14 @@ async def test_proxy_non_streaming():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         result = await provider.proxy(
+            method="POST",
             path="v1/chat/completions",
             payload={"messages": [{"role": "user", "content": "Hello"}]},
         )
 
     assert result["id"] == "chatcmpl-abc123"
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://api.openai.com/v1/chat/completions",
         json={"messages": [{"role": "user", "content": "Hello"}]},
         timeout=mock.ANY,
@@ -1433,6 +1443,7 @@ async def test_proxy_strips_mlflow_auth_header_but_preserves_client_key():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session:
         await provider.proxy(
+            method="POST",
             path="v1/responses",
             payload={"messages": [{"role": "user", "content": "Hello"}]},
             headers={
@@ -1458,6 +1469,7 @@ async def test_proxy_strips_mlflow_auth_header_mixed_case(header_name):
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session:
         await provider.proxy(
+            method="POST",
             path="v1/responses",
             payload={"messages": [{"role": "user", "content": "Hello"}]},
             headers={
@@ -1487,6 +1499,7 @@ async def test_proxy_streaming():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         result = await provider.proxy(
+            method="POST",
             path="v1/chat/completions",
             payload={"messages": [{"role": "user", "content": "Hello"}], "stream": True},
         )
