@@ -1,5 +1,6 @@
 import contextlib
 import json
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -4606,3 +4607,77 @@ def test_invocations_passes_caller_and_trace_metadata_to_budget_enforcement(
     check_kwargs = mock_check.call_args.kwargs
     assert check_kwargs["request_headers"]["x-mlflow-gateway-caller"] == "judge"
     assert check_kwargs["metadata"][TraceMetadataKey.AUTH_USERNAME] == "alice@example.com"
+
+
+# =============================================================================
+# Raw proxy route tests
+# =============================================================================
+
+
+def _raw_proxy_client(mock_provider, store):
+    app = FastAPI()
+    app.include_router(gateway_router)
+    mock_endpoint_config = GatewayEndpointConfig(
+        endpoint_id="test-endpoint-id", endpoint_name="my-endpoint", models=[]
+    )
+    return TestClient(app), [
+        patch("mlflow.server.gateway_api._get_store", return_value=store),
+        patch("mlflow.server.gateway_api.get_request_workspace", return_value=None),
+        patch("mlflow.server.gateway_api.check_budget_limit"),
+        patch("mlflow.server.gateway_api.load_guardrails", return_value=[]),
+        patch(
+            "mlflow.server.gateway_api._create_provider_from_endpoint_name",
+            return_value=(mock_provider, mock_endpoint_config),
+        ),
+    ]
+
+
+def test_raw_proxy_get_forwards_method_without_body(store: SqlAlchemyStore):
+    mock_provider = MagicMock()
+    mock_provider.proxy = AsyncMock(return_value={"object": "list", "data": []})
+    client, patches = _raw_proxy_client(mock_provider, store)
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        response = client.get("/gateway/proxy/my-endpoint/models")
+
+    assert response.status_code == 200
+    assert response.json() == {"object": "list", "data": []}
+    path, body, headers = mock_provider.proxy.call_args.args
+    assert mock_provider.proxy.call_args.kwargs["method"] == "GET"
+    assert path == "models"
+    assert body == {}
+
+
+def test_raw_proxy_get_preserves_query_string(store: SqlAlchemyStore):
+    mock_provider = MagicMock()
+    mock_provider.proxy = AsyncMock(return_value={"object": "list", "data": []})
+    client, patches = _raw_proxy_client(mock_provider, store)
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        response = client.get("/gateway/proxy/my-endpoint/models?limit=5&after=x")
+
+    assert response.status_code == 200
+    assert mock_provider.proxy.call_args.args[0] == "models?limit=5&after=x"
+
+
+def test_raw_proxy_post_unchanged(store: SqlAlchemyStore):
+    mock_provider = MagicMock()
+    mock_provider.proxy = AsyncMock(return_value={"id": "chatcmpl-1"})
+    client, patches = _raw_proxy_client(mock_provider, store)
+
+    payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": "Hi"}]}
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        response = client.post("/gateway/proxy/my-endpoint/v1/chat/completions", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "chatcmpl-1"}
+    path, body, headers = mock_provider.proxy.call_args.args
+    assert mock_provider.proxy.call_args.kwargs["method"] == "POST"
+    assert path == "v1/chat/completions"
+    assert body == payload

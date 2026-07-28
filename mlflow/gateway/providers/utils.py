@@ -27,8 +27,12 @@ def parse_base64_data_url(url: str) -> tuple[str, str] | None:
 _STRIPPED_HEADERS = frozenset({
     "accept-encoding",
     "content-encoding",
+    "cookie",
     MLFLOW_GATEWAY_AUTH_HEADER.lower(),
 })
+
+# HTTP methods that must never carry a JSON request body.
+_BODYLESS_METHODS = frozenset({"GET", "HEAD", "DELETE", "OPTIONS"})
 
 # Accumulates the total time (ms) spent waiting for provider HTTP responses in the current
 # request context. Reset to 0.0 at the start of each request by the gateway timing middleware
@@ -41,9 +45,10 @@ SUPPORTED_ACCEPT_ENCODING = "gzip, deflate, identity"
 
 
 @asynccontextmanager
-async def _aiohttp_post(
+async def _aiohttp_request(
     headers: dict[str, str],
     base_url: str,
+    method: str,
     path: str,
     payload: dict[str, Any],
     *,
@@ -63,13 +68,16 @@ async def _aiohttp_post(
         # Overriding the TLS host name is for self-calls, never for a user-controlled upstream.
         raise ValueError("server_hostname can only be set when ssrf_protect is False.")
 
+    method = method.upper()
+
     # Drop any client Accept-Encoding (any casing) so we send only one value; otherwise
     # aiohttp may send both and upstream can respond with Brotli, which is not supported.
     # Also drop Content-Encoding, which describes the body the client sent, not the JSON
     # re-serialized below (e.g. a zstd-encoded request body is decompressed before it gets
     # here). And drop X-MLflow-Authorization (MLflow's own RBAC credential on gateway routes)
-    # so it is never forwarded to the upstream provider. This is the single egress choke
-    # point all proxy/passthrough paths funnel through, so SSRF protection lives here too:
+    # and Cookie (MLflow session cookies) so neither is ever forwarded to the upstream provider.
+    # This is the single egress choke point all proxy/passthrough paths funnel through, so SSRF
+    # protection lives here too:
     # the upstream host may come from a user-supplied secret `api_base`, so the connection
     # target is checked at connect time (see mlflow.gateway.ssrf) and redirects are never
     # followed, as a redirect could otherwise steer the request to an internal address.
@@ -91,11 +99,13 @@ async def _aiohttp_post(
         ) as session:
             timeout = aiohttp.ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get())
             # ClientSession.__aenter__ opens no connection; the resolver runs while
-            # session.post(...).__aenter__ acquires one, which this try encloses.
-            post_kwargs = {"server_hostname": server_hostname} if server_hostname else {}
+            # session.request(...).__aenter__ acquires one, which this try encloses.
+            request_kwargs = {} if method in _BODYLESS_METHODS else {"json": payload}
+            if server_hostname:
+                request_kwargs["server_hostname"] = server_hostname
             try:
-                async with session.post(
-                    url, json=payload, timeout=timeout, allow_redirects=False, **post_kwargs
+                async with session.request(
+                    method, url, timeout=timeout, allow_redirects=False, **request_kwargs
                 ) as response:
                     yield response
             except GatewaySSRFProtectionError as e:
@@ -127,6 +137,7 @@ def _error_detail(error_body: Any) -> str:
 async def send_request(
     headers: dict[str, str],
     base_url: str,
+    method: str,
     path: str,
     payload: dict[str, Any],
     *,
@@ -139,6 +150,7 @@ async def send_request(
     Args:
         headers: The headers to include in the request.
         base_url: The base URL where the request will be sent.
+        method: The HTTP method to use. Body-less methods (e.g. ``GET``) ignore ``payload``.
         path: The specific path of the URL to which the request will be sent.
         payload: The payload (or data) to be included in the request.
         ssrf_protect: Whether to apply the gateway's upstream SSRF protection (see
@@ -159,9 +171,10 @@ async def send_request(
 
     start = time.perf_counter()
     try:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers,
             base_url,
+            method,
             path,
             payload,
             ssrf_protect=ssrf_protect,
@@ -192,7 +205,11 @@ async def send_request(
 
 
 async def send_stream_request(
-    headers: dict[str, str], base_url: str, path: str, payload: dict[str, Any]
+    headers: dict[str, str],
+    base_url: str,
+    method: str,
+    path: str,
+    payload: dict[str, Any],
 ) -> AsyncGenerator[bytes, None]:
     """
     Send a streaming HTTP request to a specific URL path with given headers and payload.
@@ -200,6 +217,7 @@ async def send_stream_request(
     Args:
         headers: The headers to include in the request.
         base_url: The base URL where the request will be sent.
+        method: The HTTP method to use. Body-less methods (e.g. ``GET``) ignore ``payload``.
         path: The specific path of the URL to which the request will be sent.
         payload: The payload (or data) to be included in the request.
 
@@ -212,7 +230,7 @@ async def send_stream_request(
     import aiohttp
     from fastapi import HTTPException
 
-    async with _aiohttp_post(headers, base_url, path, payload) as response:
+    async with _aiohttp_request(headers, base_url, method, path, payload) as response:
         try:
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:
@@ -256,6 +274,7 @@ _STREAMING_CONTENT_TYPES = frozenset({"text/event-stream", "application/x-ndjson
 async def send_proxy_request(
     headers: dict[str, str],
     base_url: str,
+    method: str,
     path: str,
     payload: dict[str, Any],
 ) -> AsyncGenerator[dict[str, Any] | bytes, None]:
@@ -270,13 +289,15 @@ async def send_proxy_request(
 
     Callers should consume all items or explicitly call ``aclose()`` to release the
     underlying HTTP connection.
+
+    Body-less methods (e.g. ``GET``) ignore ``payload``.
     """
     import aiohttp
     from fastapi import HTTPException
 
     start = time.perf_counter()
     try:
-        async with _aiohttp_post(headers, base_url, path, payload) as response:
+        async with _aiohttp_request(headers, base_url, method, path, payload) as response:
             try:
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:

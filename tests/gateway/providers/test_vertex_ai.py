@@ -141,7 +141,7 @@ async def test_claude_passthrough_request_omits_filtered_anthropic_beta():
             headers={"anthropic-beta": "advisor-tool-2026-03-01", "x-request-id": "req-1"},
         )
 
-    mock_client.post.assert_called_once()
+    mock_client.request.assert_called_once()
     assert "anthropic-beta" not in captured_session_headers
     assert captured_session_headers["x-request-id"] == "req-1"
     assert captured_session_headers["Authorization"] == "Bearer mock-access-token"
@@ -175,15 +175,15 @@ async def test_chat():
 async def test_gemini_passthrough_uses_vertex_endpoint():
     provider = _make_provider()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(_chat_response())
-    ) as mock_post:
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(_chat_response())
+    ) as mock_request:
         response = await provider.passthrough(
             PassthroughAction.GEMINI_GENERATE_CONTENT,
             {"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]},
         )
 
     assert response["candidates"][0]["content"]["parts"][0]["text"] == "Hello from Vertex AI!"
-    assert mock_post.call_args[0][0] == (
+    assert mock_request.call_args[0][1] == (
         "https://us-central1-aiplatform.googleapis.com"
         "/v1/projects/my-gcp-project/locations/us-central1/publishers/google/models"
         "/gemini-2.0-flash:generateContent"
@@ -249,7 +249,7 @@ async def test_chat_tool_calling_omits_function_call_id():
         ]
     }
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         await provider.chat(chat.RequestPayload(**_tool_calling_second_turn_payload()))
 
@@ -291,7 +291,7 @@ async def test_chat_tool_calling_preserves_thought_signature():
         ]
     }
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         await provider.chat(chat.RequestPayload(**payload))
 
@@ -328,8 +328,8 @@ async def test_chat_tool_choice(stream):
         else:
             await provider.chat(request)
 
-    mock_client.post.assert_called_once()
-    sent_payload = mock_client.post.call_args.kwargs["json"]
+    mock_client.request.assert_called_once()
+    sent_payload = mock_client.request.call_args.kwargs["json"]
     assert sent_payload["toolConfig"] == {
         "functionCallingConfig": {"mode": "ANY", "allowedFunctionNames": ["get_weather"]}
     }
@@ -350,7 +350,7 @@ async def test_chat_stream_tool_calling_omits_function_call_id():
         stream = provider.chat_stream(chat.RequestPayload(**payload))
         _ = [chunk async for chunk in stream]
 
-    contents = mock_client.post.call_args[1]["json"]["contents"]
+    contents = mock_client.request.call_args[1]["json"]["contents"]
     assert "id" not in _find_part(contents, "functionCall")
     assert "id" not in _find_part(contents, "functionResponse")
 
@@ -435,7 +435,7 @@ async def test_chat_parallel_tool_calls_omit_all_function_call_ids():
         ]
     }
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         await provider.chat(chat.RequestPayload(**payload))
 
@@ -706,7 +706,9 @@ async def test_claude_chat_uses_raw_predict_endpoint():
 
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         payload = chat.RequestPayload(messages=[{"role": "user", "content": "Hello"}])
         response = await provider.chat(payload)
@@ -718,6 +720,7 @@ async def test_claude_chat_uses_raw_predict_endpoint():
     assert result["usage"]["completion_tokens"] == 15
 
     mock_post.assert_called_once_with(
+        "POST",
         "https://us-east5-aiplatform.googleapis.com/v1/projects/my-gcp-project"
         "/locations/us-east5/publishers/anthropic/models"
         "/claude-sonnet-4-5@20251101:rawPredict",
@@ -760,9 +763,9 @@ async def test_claude_chat_stream_uses_stream_raw_predict_endpoint():
         chunks = [chunk async for chunk in provider.chat_stream(payload)]
 
     assert len(chunks) > 0
-    mock_client.post.assert_called_once()
-    call_kwargs = mock_client.post.call_args
-    assert ":streamRawPredict" in call_kwargs[0][0]
+    mock_client.request.assert_called_once()
+    call_kwargs = mock_client.request.call_args
+    assert ":streamRawPredict" in call_kwargs[0][1]
     assert call_kwargs[1]["json"]["anthropic_version"] == "vertex-2023-10-16"
     assert "model" not in call_kwargs[1]["json"]
 
@@ -843,7 +846,8 @@ async def test_claude_passthrough_uses_raw_predict_endpoint():
         )
 
     assert response["content"][0]["text"] == "Hello from Claude on Vertex AI!"
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://us-east5-aiplatform.googleapis.com/v1/projects/my-gcp-project"
         "/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5@20251101:rawPredict",
         json={
@@ -891,9 +895,9 @@ async def test_claude_passthrough_stream_uses_stream_raw_predict_endpoint():
         chunks = [chunk async for chunk in stream]
 
     assert chunks == stream_data
-    mock_client.post.assert_called_once()
-    url = mock_client.post.call_args[0][0]
-    body = mock_client.post.call_args[1]["json"]
+    mock_client.request.assert_called_once()
+    url = mock_client.request.call_args[0][1]
+    body = mock_client.request.call_args[1]["json"]
     assert url.endswith("/claude-sonnet-4-5@20251101:streamRawPredict")
     assert body["anthropic_version"] == "vertex-2023-10-16"
     assert "model" not in body
@@ -926,7 +930,8 @@ async def test_claude_proxy_maps_messages_path_to_raw_predict(path):
         )
 
     assert response["content"][0]["text"] == "Hello from Claude on Vertex AI!"
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://us-east5-aiplatform.googleapis.com/v1/projects/my-gcp-project"
         "/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5@20251101:rawPredict",
         json={
@@ -952,8 +957,10 @@ async def test_claude_proxy_streams_from_stream_raw_predict_endpoint():
         chunks = [chunk async for chunk in result]
 
     assert chunks == stream_data
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args[0][0].endswith("/claude-sonnet-4-5@20251101:streamRawPredict")
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args[0][1].endswith(
+        "/claude-sonnet-4-5@20251101:streamRawPredict"
+    )
 
 
 @pytest.mark.asyncio
@@ -1035,8 +1042,8 @@ async def test_maas_chat_uses_openai_format():
 
     with (
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncResponse(_maas_chat_response())
-        ) as mock_post,
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(_maas_chat_response())
+        ) as mock_request,
     ):
         payload = chat.RequestPayload(messages=[{"role": "user", "content": "Hello"}])
         response = await provider.chat(payload)
@@ -1045,7 +1052,8 @@ async def test_maas_chat_uses_openai_format():
     assert result["choices"][0]["message"]["content"] == "Hello from Llama on Vertex AI!"
     assert result["usage"]["prompt_tokens"] == 10
 
-    mock_post.assert_called_once_with(
+    mock_request.assert_called_once_with(
+        "POST",
         "https://us-central1-aiplatform.googleapis.com"
         "/v1/projects/my-gcp-project/locations/us-central1/endpoints/openapi/chat/completions",
         json={
@@ -1063,14 +1071,15 @@ async def test_maas_passthrough_uses_openapi_endpoint():
     provider = _make_maas_provider("meta/llama-3.1-405b-instruct-maas")
 
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(_maas_chat_response())
-    ) as mock_post:
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(_maas_chat_response())
+    ) as mock_request:
         response = await provider.passthrough(
             PassthroughAction.OPENAI_CHAT, {"messages": [{"role": "user", "content": "Hello"}]}
         )
 
     assert response["choices"][0]["message"]["content"] == "Hello from Llama on Vertex AI!"
-    mock_post.assert_called_once_with(
+    mock_request.assert_called_once_with(
+        "POST",
         "https://us-central1-aiplatform.googleapis.com"
         "/v1/projects/my-gcp-project/locations/us-central1/endpoints/openapi/chat/completions",
         json={
@@ -1146,7 +1155,8 @@ async def test_maas_proxy_posts_to_openapi_endpoint(path):
     assert response == resp
     # The "/openapi" segment is part of the API root and must survive, unlike the "/v1"
     # suffix that OpenAICompatibleProvider._proxy is written to strip.
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://us-central1-aiplatform.googleapis.com"
         "/v1/projects/my-gcp-project/locations/us-central1/endpoints/openapi/chat/completions",
         json=payload,
@@ -1177,8 +1187,8 @@ async def test_maas_proxy_streams_when_upstream_sends_event_stream():
         chunks = [chunk async for chunk in result]
 
     assert chunks == stream_data
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args[0][0].endswith("/endpoints/openapi/chat/completions")
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args[0][1].endswith("/endpoints/openapi/chat/completions")
 
 
 @pytest.mark.asyncio
@@ -1250,7 +1260,7 @@ async def test_claude_chat_sends_cache_control(stream):
         else:
             await provider.chat(payload)
 
-    body = mock_client.post.call_args.kwargs["json"]
+    body = mock_client.request.call_args.kwargs["json"]
     assert body["system"] == [
         {"type": "text", "text": "Rules", "cache_control": {"type": "ephemeral"}}
     ]
@@ -1272,7 +1282,7 @@ async def test_maas_chat_does_not_send_cache_control():
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         await provider.chat(chat.RequestPayload(messages=_cache_control_messages()))
 
-    assert mock_client.post.call_args.kwargs["json"]["messages"] == [
+    assert mock_client.request.call_args.kwargs["json"]["messages"] == [
         {"role": "system", "content": [{"type": "text", "text": "Rules"}]},
         {"role": "user", "content": [{"type": "text", "text": "Doc"}]},
     ]
@@ -1323,7 +1333,7 @@ async def test_maas_chat_does_not_send_thought_signature():
             )
         )
 
-    assert mock_client.post.call_args.kwargs["json"]["messages"][1] == {
+    assert mock_client.request.call_args.kwargs["json"]["messages"][1] == {
         "role": "assistant",
         "tool_calls": [tool_call],
     }

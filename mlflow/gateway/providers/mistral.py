@@ -247,6 +247,7 @@ class MistralProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=path,
             payload=payload,
         )
@@ -286,6 +287,7 @@ class MistralProvider(BaseProvider):
         stream = send_stream_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="chat/completions",
             payload=MistralAdapter.chat_to_model(payload, self.config),
         )

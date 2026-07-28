@@ -17,7 +17,7 @@ from tests.gateway.tools import MockAsyncResponse, MockAsyncStreamingResponse, m
 
 TEST_STRING = "This is a test"
 CONTENT_TYPE = "application/json"
-TARGET = "aiohttp.ClientSession.post"
+TARGET = "aiohttp.ClientSession.request"
 
 
 def completions_config():
@@ -89,6 +89,7 @@ async def test_completions():
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.mistral.ai/v1/chat/completions",
             json={
                 "messages": [{"role": "user", "content": TEST_STRING}],
@@ -429,7 +430,8 @@ async def _run_test_chat_stream(resp, provider):
         mock_build_client.assert_called_once()
         call_headers = mock_build_client.call_args.kwargs["headers"]
         assert call_headers.get("Authorization") == "Bearer key"
-        mock_client.post.assert_called_once_with(
+        mock_client.request.assert_called_once_with(
+            "POST",
             "https://api.mistral.ai/v1/chat/completions",
             json={
                 "model": "mistral-large-latest",
@@ -469,7 +471,8 @@ async def test_chat_stream_includes_usage_from_final_chunk():
         chunks = [c async for c in provider.chat_stream(chat.RequestPayload(**payload))]
 
     mock_session.assert_called_once()
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://api.mistral.ai/v1/chat/completions",
         json={"model": "mistral-large-latest", "n": 1, **payload},
         timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -558,7 +561,7 @@ async def test_chat_stream_drops_thinking_content():
         chunks = [c async for c in provider.chat_stream(chat.RequestPayload(**payload))]
 
     mock_session.assert_called_once()
-    mock_client.post.assert_called_once()
+    mock_client.request.assert_called_once()
     assert [c.choices[0].delta.content for c in chunks] == [
         None,
         "Hello! How can I help you today?",

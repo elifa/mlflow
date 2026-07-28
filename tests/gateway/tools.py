@@ -148,8 +148,8 @@ class MockHttpClient(mock.Mock):
     def __init__(self, mock_response=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._mock_response = mock_response
-        # Create a mock for post that returns the response
-        self.post = mock.Mock(return_value=mock_response)
+        # All provider traffic goes through session.request(method, url, ...)
+        self.request = mock.Mock(return_value=mock_response)
 
     async def __aenter__(self):
         return self

@@ -1247,7 +1247,8 @@ async def test_bedrock_anthropic_passthrough_posts_to_invoke(model_name, model_p
         )
 
     assert response == _anthropic_messages_response()
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         f"https://bedrock-runtime.eu-west-1.amazonaws.com/model/{model_path}/invoke",
         json={
             "messages": [{"role": "user", "content": "Hello"}],
@@ -1290,7 +1291,7 @@ async def test_bedrock_converse_chat_with_api_key_posts_to_converse(model_name, 
         )
 
     assert response.choices[0].message.content == "Hello from Bedrock!"
-    assert mock_client.post.call_args.args[0] == (
+    assert mock_client.request.call_args.args[1] == (
         f"https://bedrock-runtime.eu-west-1.amazonaws.com/model/{model_path}/converse"
     )
 
@@ -1320,12 +1321,12 @@ async def test_bedrock_anthropic_passthrough_stream_converts_event_stream_to_sse
     assert output == b"".join(
         f"event: {event['type']}\ndata: {json.dumps(event)}\n\n".encode() for event in events
     )
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args[0][0] == (
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args[0][1] == (
         f"https://bedrock-runtime.eu-west-1.amazonaws.com/model/{_CLAUDE_MODEL_ID}"
         "/invoke-with-response-stream"
     )
-    assert mock_client.post.call_args[1]["json"] == {
+    assert mock_client.request.call_args[1]["json"] == {
         "messages": [{"role": "user", "content": "Hello"}],
         "max_tokens": 64,
         "anthropic_version": "bedrock-2023-05-31",
@@ -1375,7 +1376,7 @@ async def test_bedrock_anthropic_passthrough_stream_raises_bedrock_exception(
             [chunk async for chunk in stream]
 
     assert exc_info.value.status_code == status_code
-    mock_client.post.assert_called_once()
+    mock_client.request.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -1403,7 +1404,7 @@ async def test_bedrock_anthropic_passthrough_stream_raises_bedrock_error_frame()
             [chunk async for chunk in stream]
 
     assert exc_info.value.status_code == 429
-    mock_client.post.assert_called_once()
+    mock_client.request.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -1421,7 +1422,7 @@ async def test_bedrock_anthropic_passthrough_stream_requires_botocore():
             [chunk async for chunk in stream]
 
     # The import fails before the request is sent, so nothing reaches Bedrock.
-    mock_client.post.assert_not_called()
+    mock_client.request.assert_not_called()
 
 
 def test_bedrock_anthropic_passthrough_token_usage():
@@ -1597,7 +1598,7 @@ async def test_bedrock_converse_with_api_key_adds_cache_points():
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         await provider.chat(chat.RequestPayload(messages=_cache_control_messages()))
 
-    body = mock_client.post.call_args.kwargs["json"]
+    body = mock_client.request.call_args.kwargs["json"]
     assert body["system"] == _EXPECTED_CACHED_SYSTEM
     assert body["messages"] == _EXPECTED_CACHED_MESSAGES
 

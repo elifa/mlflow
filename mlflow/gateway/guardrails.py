@@ -347,6 +347,7 @@ class JudgeGuardrail(Guardrail):
                 resp_json = await send_request(
                     headers=headers,
                     base_url=url,
+                    method="POST",
                     path=path,
                     payload=body,
                     ssrf_protect=False,

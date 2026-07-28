@@ -46,7 +46,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = MosaicMLProvider(EndpointConfig(**config))
         payload = {
@@ -63,6 +65,7 @@ async def test_completions():
             "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://models.hosted-on.mosaicml.hosting/mpt-7b-instruct/v1/predict",
             json={
                 "inputs": ["This is a test"],
@@ -167,7 +170,9 @@ async def test_chat(payload, expected_llm_input):
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1700242674),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = MosaicMLProvider(EndpointConfig(**config))
         response = await provider.chat(chat.RequestPayload(**payload))
@@ -196,6 +201,7 @@ async def test_chat(payload, expected_llm_input):
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://models.hosted-on.mosaicml.hosting/llama2-70b-chat/v1/predict",
             json=expected_llm_input,
             timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -262,7 +268,7 @@ async def test_embeddings():
     resp = embeddings_response()
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = MosaicMLProvider(EndpointConfig(**config))
         payload = {"input": ["This is a", "batch test"]}
@@ -294,7 +300,7 @@ async def test_batch_embeddings():
     resp = embeddings_batch_response()
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = MosaicMLProvider(EndpointConfig(**config))
         payload = {"input": "This is a test"}
@@ -530,7 +536,9 @@ async def test_completions_raises_with_invalid_max_tokens_too_large():
         "message": error_msg["message"],
     }
 
-    with mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp, status=500)):
+    with mock.patch(
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp, status=500)
+    ):
         provider = MosaicMLProvider(EndpointConfig(**config))
         payload = {
             "prompt": "How many puffins can fit on the flight deck of a Nimitz class "
@@ -553,7 +561,9 @@ async def test_chat_raises_with_invalid_max_tokens_too_large():
     resp = {
         "message": error_msg["message"],
     }
-    with mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp, status=500)):
+    with mock.patch(
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp, status=500)
+    ):
         provider = MosaicMLProvider(EndpointConfig(**config))
         payload = {
             "messages": [

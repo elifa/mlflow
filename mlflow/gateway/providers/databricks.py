@@ -169,6 +169,7 @@ class DatabricksProvider(OpenAICompatibleProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self._api_base,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )
@@ -177,6 +178,7 @@ class DatabricksProvider(OpenAICompatibleProvider):
             return await send_request(
                 headers=request_headers,
                 base_url=self._api_base,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )

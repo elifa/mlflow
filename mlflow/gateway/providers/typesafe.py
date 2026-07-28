@@ -42,6 +42,7 @@ class TypeSafeProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path=provider_path,
             payload=request_payload,
         )

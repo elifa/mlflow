@@ -113,6 +113,7 @@ class MlflowModelServingProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.mlflow_config.model_server_url,
+            method="POST",
             path="invocations",
             payload=self._process_payload(payload, "prompt"),
         )
@@ -166,6 +167,7 @@ class MlflowModelServingProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.mlflow_config.model_server_url,
+            method="POST",
             path="invocations",
             payload=payload,
         )
@@ -214,6 +216,7 @@ class MlflowModelServingProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.mlflow_config.model_server_url,
+            method="POST",
             path="invocations",
             payload=self._process_payload(payload, "input"),
         )

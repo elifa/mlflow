@@ -236,6 +236,7 @@ class _VertexAIClaudeProvider(AnthropicProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=path,
                 payload=payload,
             )
@@ -243,6 +244,7 @@ class _VertexAIClaudeProvider(AnthropicProvider):
         return await send_request(
             headers=request_headers,
             base_url=self.base_url,
+            method="POST",
             path=path,
             payload=payload,
         )
@@ -252,6 +254,8 @@ class _VertexAIClaudeProvider(AnthropicProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         # Vertex exposes Claude only through the Messages API, at a per-model
         # :rawPredict / :streamRawPredict path, so the caller's path cannot be appended to
@@ -269,6 +273,7 @@ class _VertexAIClaudeProvider(AnthropicProvider):
         gen = send_proxy_request(
             self._get_headers(payload, headers),
             self.base_url,
+            method,
             self._get_passthrough_path(payload),
             payload,
         )
@@ -329,6 +334,8 @@ class _VertexAIMaaSProvider(OpenAICompatibleProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         # OpenAICompatibleProvider._proxy strips the last segment of _api_base to undo a
         # "/v1" suffix. Here that segment is "/openapi", which is part of the Vertex API
@@ -337,6 +344,7 @@ class _VertexAIMaaSProvider(OpenAICompatibleProvider):
         gen = send_proxy_request(
             self._get_headers(headers),
             self._api_base,
+            method,
             path.lstrip("/").removeprefix("v1/"),
             payload,
         )
@@ -476,10 +484,10 @@ class VertexAIProvider(GeminiProvider):
             return await self._delegate._passthrough(action, payload, headers)
         return await super()._passthrough(action, payload, headers)
 
-    async def _proxy(self, path, payload, headers=None):
+    async def _proxy(self, path, payload, headers=None, *, method="POST"):
         if self._delegate:
-            return await self._delegate._proxy(path, payload, headers)
-        return await super()._proxy(path, payload, headers)
+            return await self._delegate._proxy(path, payload, headers, method=method)
+        return await super()._proxy(path, payload, headers, method=method)
 
     def _extract_passthrough_token_usage(self, action, result):
         # The public `passthrough` runs on this class, so the delegate's response

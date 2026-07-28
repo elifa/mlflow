@@ -67,7 +67,9 @@ async def test_chat():
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = CohereProvider(EndpointConfig(**config))
         payload = chat_payload()
@@ -97,6 +99,7 @@ async def test_chat():
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.cohere.ai/v1/chat",
             json={
                 "model": "command",
@@ -118,7 +121,9 @@ async def test_chat_with_system_messages():
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = CohereProvider(EndpointConfig(**config))
         payload = {
@@ -133,6 +138,7 @@ async def test_chat_with_system_messages():
         }
         await provider.chat(chat.RequestPayload(**payload))
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.cohere.ai/v1/chat",
             json={
                 "model": "command",
@@ -187,7 +193,7 @@ async def test_chat_stream():
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = CohereProvider(EndpointConfig(**config))
@@ -266,6 +272,7 @@ async def test_chat_stream():
             },
         ]
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.cohere.ai/v1/chat",
             json={
                 "model": "command",
@@ -316,7 +323,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = CohereProvider(EndpointConfig(**config))
         payload = {
@@ -340,6 +349,7 @@ async def test_completions():
             "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.cohere.ai/v1/generate",
             json={
                 "prompt": "This is a test",
@@ -357,7 +367,7 @@ async def test_completions_temperature_is_scaled_correctly():
     resp = completions_response()
     config = completions_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = CohereProvider(EndpointConfig(**config))
         payload = {
@@ -388,7 +398,7 @@ async def test_completions_stream():
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = CohereProvider(EndpointConfig(**config))
@@ -456,6 +466,7 @@ async def test_completions_stream():
             },
         ]
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.cohere.ai/v1/generate",
             json={
                 "prompt": "This is a test",
@@ -549,7 +560,7 @@ async def test_embeddings():
     resp = embeddings_response()
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = CohereProvider(EndpointConfig(**config))
         payload = {"input": "This is a test"}
@@ -581,7 +592,7 @@ async def test_batch_embeddings():
     resp = embeddings_batch_response()
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = CohereProvider(EndpointConfig(**config))
         payload = {"input": ["This is a", "batch test"]}

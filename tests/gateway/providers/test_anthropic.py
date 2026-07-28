@@ -155,7 +155,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = {
@@ -167,6 +169,7 @@ async def test_completions():
         response = await provider.completions(completions.RequestPayload(**payload))
         assert jsonable_encoder(response) == parsed_completions_response()
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/complete",
             json={
                 "model": "claude-instant-1",
@@ -186,13 +189,16 @@ async def test_completions_with_default_max_tokens():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = {"prompt": "How does a car work?"}
         response = await provider.completions(completions.RequestPayload(**payload))
         assert jsonable_encoder(response) == parsed_completions_response()
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/complete",
             json={
                 "model": "claude-instant-1",
@@ -342,7 +348,9 @@ async def test_chat():
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = chat_payload()
@@ -372,6 +380,7 @@ async def test_chat():
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "model": "claude-2.1",
@@ -395,7 +404,9 @@ async def test_chat_with_max_completion_tokens():
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = {
@@ -473,7 +484,9 @@ async def test_chat_function_calling():
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = chat_function_calling_payload()
@@ -510,6 +523,7 @@ async def test_chat_function_calling():
         }
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "model": "claude-2.1",
@@ -555,7 +569,9 @@ async def test_chat_function_calling_with_tool_choice(openai_tool_choice, anthro
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
         payload = chat_function_calling_payload()
@@ -633,7 +649,7 @@ async def test_chat_stream():
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
@@ -723,6 +739,7 @@ async def test_chat_stream():
             },
         ]
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "model": "claude-2.1",
@@ -782,7 +799,7 @@ async def test_chat_function_calling_stream():
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
@@ -889,6 +906,7 @@ async def test_chat_function_calling_stream():
             },
         ]
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "model": "claude-2.1",
@@ -956,7 +974,7 @@ def _tool_use_stream(blocks):
 async def _stream_tool_calls(blocks):
     config = chat_config()
     with mock.patch(
-        "aiohttp.ClientSession.post",
+        "aiohttp.ClientSession.request",
         return_value=MockAsyncStreamingResponse(_tool_use_stream(blocks)),
     ):
         provider = AnthropicProvider(EndpointConfig(**config))
@@ -984,7 +1002,7 @@ async def test_chat_stream_raises_on_in_band_error():
         b'"message": "Overloaded"}}\n',
         b"\n",
     ]
-    with mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)):
+    with mock.patch("aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)):
         provider = AnthropicProvider(EndpointConfig(**chat_config()))
         response = provider.chat_stream(chat.RequestPayload(**chat_payload(stream=True)))
         with pytest.raises(
@@ -1158,7 +1176,8 @@ async def test_passthrough_anthropic_messages():
 
         assert response == resp
 
-        mock_session_client.post.assert_called_once_with(
+        mock_session_client.request.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "messages": [{"role": "user", "content": "Hello"}],
@@ -1221,7 +1240,8 @@ async def test_passthrough_anthropic_messages_streaming():
         assert b"message_delta" in chunks[5]
         assert b"message_stop" in chunks[6]
 
-        mock_session_client.post.assert_called_once_with(
+        mock_session_client.request.assert_called_once_with(
+            "POST",
             "https://api.anthropic.com/v1/messages",
             json={
                 "messages": [{"role": "user", "content": "Hello"}],
@@ -1261,13 +1281,15 @@ async def test_proxy_anthropic_non_streaming():
             "max_tokens": 1024,
         }
         response = await provider.proxy(
+            method="POST",
             path="v1/messages",
             payload=payload,
             headers={"X-Request-ID": "req-001", "host": "ignored"},
         )
 
     assert response == resp
-    mock_session_client.post.assert_called_once_with(
+    mock_session_client.request.assert_called_once_with(
+        "POST",
         "https://api.anthropic.com/v1/messages",
         json=payload,
         timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -1300,7 +1322,7 @@ async def test_proxy_anthropic_streaming():
             "max_tokens": 1024,
             "stream": True,
         }
-        response = await provider.proxy(path="v1/messages", payload=payload)
+        response = await provider.proxy(method="POST", path="v1/messages", payload=payload)
         chunks = [chunk async for chunk in response]
 
     assert len(chunks) == 7
@@ -1324,7 +1346,7 @@ async def test_proxy_anthropic_streaming_detected_from_content_type():
             "max_tokens": 1024,
             # no "stream" flag
         }
-        response = await provider.proxy(path="v1/messages", payload=payload)
+        response = await provider.proxy(method="POST", path="v1/messages", payload=payload)
         chunks = [chunk async for chunk in response]
 
     assert len(chunks) == 7
@@ -1386,7 +1408,7 @@ async def test_chat_with_structured_output():
         )
         assert response.choices[0].finish_reason == "stop"
 
-        call_kwargs = mock_session_client.post.call_args[1]
+        call_kwargs = mock_session_client.request.call_args[1]
         assert call_kwargs["json"]["output_config"] == {
             "format": {
                 "type": "json_schema",
@@ -1451,7 +1473,7 @@ async def test_chat_with_structured_output_sanitizes_schema():
 
         # Schema contains a free-form dict (metadata without properties),
         # so output_config should NOT be set (falls back to plain text)
-        call_kwargs = mock_session_client.post.call_args[1]
+        call_kwargs = mock_session_client.request.call_args[1]
         assert "output_config" not in call_kwargs["json"]
 
 
@@ -1494,7 +1516,7 @@ async def test_chat_with_json_object_response_format():
 
         # Anthropic has no schema-less JSON mode, so json_object is steered via a
         # system instruction appended to the existing system message.
-        call_kwargs = mock_session_client.post.call_args[1]
+        call_kwargs = mock_session_client.request.call_args[1]
         body = call_kwargs["json"]
         assert "output_config" not in body
         assert body["system"].startswith("You are helpful.")
@@ -1889,7 +1911,7 @@ async def test_chat_stream_usage_omits_1h_cache_creation():
         b'"output_tokens": 15}}\n'
     )
 
-    with mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)):
+    with mock.patch("aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)):
         provider = AnthropicProvider(EndpointConfig(**chat_config()))
         response = provider.chat_stream(chat.RequestPayload(**chat_payload(stream=True)))
         chunks = [jsonable_encoder(chunk) async for chunk in response]
@@ -1912,13 +1934,13 @@ async def test_chat_stream_usage_takes_final_counts_from_message_delta():
     )
 
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
-    ) as mock_post:
+        "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
+    ) as mock_request:
         provider = AnthropicProvider(EndpointConfig(**chat_config()))
         response = provider.chat_stream(chat.RequestPayload(**chat_payload(stream=True)))
         chunks = [jsonable_encoder(chunk) async for chunk in response]
 
-    mock_post.assert_called_once()
+    mock_request.assert_called_once()
     usage = chunks[-1]["usage"]
     # input_tokens (120) excludes the cache tokens: 120 + 100 + 20
     assert usage["prompt_tokens"] == 240
@@ -2160,7 +2182,7 @@ async def _chat_request_body(payload, stream=False):
         mock_client = mock_http_client(MockAsyncResponse(chat_response()))
         with mock.patch("aiohttp.ClientSession", return_value=mock_client):
             await provider.chat(chat.RequestPayload(**payload))
-    return mock_client.post.call_args[1]["json"]
+    return mock_client.request.call_args[1]["json"]
 
 
 @pytest.mark.parametrize("stream", [False, True])

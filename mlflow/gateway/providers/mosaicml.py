@@ -32,6 +32,7 @@ class MosaicMLProvider(BaseProvider):
             headers=headers,
             base_url=self.mosaicml_config.mosaicml_api_base
             or "https://models.hosted-on.mosaicml.hosting",
+            method="POST",
             path=model + "/v1/predict",
             payload=payload,
         )

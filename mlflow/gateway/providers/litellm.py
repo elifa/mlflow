@@ -141,7 +141,7 @@ class LiteLLMProvider(BaseProvider):
     async def _prepare_litellm_kwargs(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Build LiteLLM kwargs and refuse any destination LiteLLM must not be sent to.
 
-        LiteLLM sends requests through its own HTTP client rather than ``_aiohttp_post``, so
+        LiteLLM sends requests through its own HTTP client rather than ``_aiohttp_request``, so
         the connect-time guard in ``mlflow.gateway.providers.utils`` never sees them. The
         destination is therefore policed here, before anything is handed to LiteLLM:
 

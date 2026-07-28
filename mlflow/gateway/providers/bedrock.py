@@ -812,6 +812,7 @@ class AmazonBedrockProvider(BaseProvider):
         resp = await send_request(
             headers=self._get_token_auth_headers(),
             base_url=self._get_token_auth_base_url(),
+            method="POST",
             # Inference profile ARNs contain "/", which has to be escaped in the path.
             path=f"model/{quote(model_id, safe=':')}/converse",
             payload=kwargs,
@@ -1005,6 +1006,7 @@ class AmazonBedrockProvider(BaseProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=base_url,
+                method="POST",
                 # InvokeModelWithResponseStream is served at the InvokeModel path plus this suffix.
                 path=f"{path}-with-response-stream",
                 payload=body,
@@ -1013,6 +1015,7 @@ class AmazonBedrockProvider(BaseProvider):
         return await send_request(
             headers=request_headers,
             base_url=base_url,
+            method="POST",
             path=path,
             payload=body,
         )

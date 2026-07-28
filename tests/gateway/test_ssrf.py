@@ -7,7 +7,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 from fastapi import HTTPException
 
-from mlflow.gateway.providers.utils import _aiohttp_post, send_request
+from mlflow.gateway.providers.utils import _aiohttp_request, send_request
 from mlflow.gateway.ssrf import (
     GatewaySSRFProtectionError,
     SSRFGuardedResolver,
@@ -182,7 +182,7 @@ async def upstream():
 @pytest.mark.asyncio
 async def test_send_request_blocks_private_ip_literal_upstream(upstream):
     with pytest.raises(HTTPException, match="not a public IP address") as exc:
-        await send_request({}, str(upstream.make_url("")), "/v1/chat", {"model": "x"})
+        await send_request({}, str(upstream.make_url("")), "POST", "/v1/chat", {"model": "x"})
     assert exc.value.status_code == 502
     assert "not a public IP address" in exc.value.detail
     assert upstream.hits == []
@@ -197,7 +197,7 @@ async def test_send_request_blocks_hostname_that_resolves_to_private_ip(upstream
     with mock.patch("mlflow.gateway.ssrf.DefaultResolver", return_value=rebinding):
         with pytest.raises(HTTPException, match="rebind.example") as exc:
             await send_request(
-                {}, f"http://rebind.example:{upstream.port}", "/v1/chat", {"model": "x"}
+                {}, f"http://rebind.example:{upstream.port}", "POST", "/v1/chat", {"model": "x"}
             )
     assert exc.value.status_code == 502
     assert "'rebind.example' resolves to 127.0.0.1" in exc.value.detail
@@ -208,15 +208,17 @@ async def test_send_request_blocks_hostname_that_resolves_to_private_ip(upstream
 @pytest.mark.asyncio
 async def test_send_request_reaches_private_upstream_when_allowed(upstream, monkeypatch):
     monkeypatch.setenv("MLFLOW_GATEWAY_API_BASE_ALLOW_PRIVATE_IPS", "true")
-    result = await send_request({}, str(upstream.make_url("")), "/v1/chat", {"model": "x"})
+    result = await send_request({}, str(upstream.make_url("")), "POST", "/v1/chat", {"model": "x"})
     assert result == {"ok": True, "path": "/v1/chat"}
     assert upstream.hits == ["/v1/chat"]
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_does_not_follow_upstream_redirects(upstream, monkeypatch):
+async def test_aiohttp_request_does_not_follow_upstream_redirects(upstream, monkeypatch):
     monkeypatch.setenv("MLFLOW_GATEWAY_API_BASE_ALLOW_PRIVATE_IPS", "true")
-    async with _aiohttp_post({}, str(upstream.make_url("")), "/redirect", {}) as response:
+    async with _aiohttp_request(
+        {}, str(upstream.make_url("")), "POST", "/redirect", {}
+    ) as response:
         assert response.status == 302
         assert response.headers["Location"] == "/internal/secret"
         assert response.history == ()
@@ -227,7 +229,7 @@ async def test_aiohttp_post_does_not_follow_upstream_redirects(upstream, monkeyp
 async def test_send_request_explicit_bypass_reaches_private_upstream(upstream):
     # Used for the server calling itself (guardrail sanitization), never for provider hosts.
     result = await send_request(
-        {}, str(upstream.make_url("")), "/v1/chat", {"model": "x"}, ssrf_protect=False
+        {}, str(upstream.make_url("")), "POST", "/v1/chat", {"model": "x"}, ssrf_protect=False
     )
     assert result == {"ok": True, "path": "/v1/chat"}
     assert upstream.hits == ["/v1/chat"]

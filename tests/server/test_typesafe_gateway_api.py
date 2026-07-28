@@ -102,6 +102,7 @@ def test_system_one_route_credentials_tracing_and_budgets(endpoint):
     send.assert_awaited_once_with(
         headers={"Authorization": "Bearer typesafe-secret"},
         base_url="https://api.typesafe.ai/v1",
+        method="POST",
         path="systemone",
         payload={**_request(), "model": "jev-1.13.0"},
     )

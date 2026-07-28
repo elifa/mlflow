@@ -68,7 +68,9 @@ async def test_completions():
 
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = TogetherAIProvider(EndpointConfig(**config))
 
@@ -107,6 +109,7 @@ async def test_completions():
         }
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.together.xyz/v1/completions",
             json={
                 "prompt": "Whats the capital of France?",
@@ -163,7 +166,7 @@ async def test_completions_stream(resp):
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = TogetherAIProvider(EndpointConfig(**config))
@@ -223,6 +226,7 @@ async def test_completions_stream(resp):
         ]
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.together.xyz/v1/completions",
             json={
                 "model": "mistralai/Mixtral-8x7B-v0.1",
@@ -246,7 +250,9 @@ async def test_max_tokens_missing_error():
     # Mock the post method to return the response payload
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         # Instantiate the provider
         provider = TogetherAIProvider(EndpointConfig(**config))
@@ -284,7 +290,9 @@ async def test_wrong_logprobs_type_error():
     # Mock the post method to return the response payload
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         # Instantiate the provider
         provider = TogetherAIProvider(EndpointConfig(**config))
@@ -346,7 +354,9 @@ async def test_embeddings():
 
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = TogetherAIProvider(EndpointConfig(**config))
 
@@ -371,6 +381,7 @@ async def test_embeddings():
         }
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.together.xyz/v1/embeddings",
             json={
                 "input": "Our solar system orbits the Milky Way galaxy at about 515,000 mph.",
@@ -413,7 +424,9 @@ async def test_chat():
 
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = TogetherAIProvider(EndpointConfig(**config))
 
@@ -449,6 +462,7 @@ async def test_chat():
         }
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.together.xyz/v1/chat/completions",
             json={
                 "messages": [{"role": "user", "content": "Who's the protagonist in Metro 2033?"}],
@@ -503,7 +517,7 @@ async def test_chat_stream(resp):
     with (
         mock.patch("time.time", return_value=1677858242),
         mock.patch(
-            "aiohttp.ClientSession.post", return_value=MockAsyncStreamingResponse(resp)
+            "aiohttp.ClientSession.request", return_value=MockAsyncStreamingResponse(resp)
         ) as mock_post,
     ):
         provider = TogetherAIProvider(EndpointConfig(**config))
@@ -586,6 +600,7 @@ async def test_chat_stream(resp):
         ]
 
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.together.xyz/v1/chat/completions",
             json={
                 "model": "mistralai/Mixtral-8x7B-v0.1",

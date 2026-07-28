@@ -5,7 +5,7 @@ internal hosts, or rows stored before it existed. This module enforces the same 
 the egress point: ``SSRFGuardedResolver`` rejects non-public addresses before aiohttp dials
 them, ``assert_public_upstream_url`` covers IP literals (which aiohttp never resolves), and
 ``assert_public_upstream_host`` is the pre-call check for LiteLLM's own HTTP client.
-``_aiohttp_post`` never follows redirects.
+``_aiohttp_request`` never follows redirects.
 
 Enforcement is per request via ``upstream_ssrf_protection`` (set in
 ``mlflow.server.gateway_api._enable_upstream_ssrf_protection``) and is skipped entirely
@@ -99,7 +99,7 @@ async def _getaddrinfo(hostname: str) -> list[Any]:
 async def assert_public_upstream_host(url: str) -> None:
     """Resolve an upstream URL's host and reject it unless every address is public.
 
-    For clients that bypass ``_aiohttp_post`` (LiteLLM). The lookup is separate from the
+    For clients that bypass ``_aiohttp_request`` (LiteLLM). The lookup is separate from the
     client's own, so a DNS-rebinding window remains between the two.
     """
     if not upstream_protection_enabled():

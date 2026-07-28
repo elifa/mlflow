@@ -94,6 +94,6 @@ async def test_chat_does_not_send_cache_control():
         )
         await provider.chat(payload)
 
-    assert mock_client.post.call_args.kwargs["json"]["messages"] == [
+    assert mock_client.request.call_args.kwargs["json"]["messages"] == [
         {"role": "user", "content": [{"type": "text", "text": "Doc"}]}
     ]

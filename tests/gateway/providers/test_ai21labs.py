@@ -96,7 +96,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = AI21LabsProvider(EndpointConfig(**config))
         payload = {
@@ -116,6 +118,7 @@ async def test_completions():
             "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://api.ai21.com/studio/v1/j2-ultra/complete",
             json={
                 "temperature": 0.2,

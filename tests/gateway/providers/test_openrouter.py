@@ -37,7 +37,7 @@ class MockAsyncResponse:
 class MockHttpClient(mock.Mock):
     def __init__(self, mock_response=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.post = mock.Mock(return_value=mock_response)
+        self.request = mock.Mock(return_value=mock_response)
 
     async def __aenter__(self):
         return self
@@ -145,6 +145,7 @@ async def test_system_one_passthrough_uses_endpoint_credentials_only():
     send.assert_awaited_once_with(
         headers={"Authorization": "Bearer sk-or-test-key"},
         base_url="https://openrouter.ai/api/v1",
+        method="POST",
         path="systemone",
         payload={"model": "typesafe/jev-1.13", **payload},
     )
@@ -182,4 +183,4 @@ async def test_chat_sends_cache_control():
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         await provider.chat(chat.RequestPayload(messages=messages))
 
-    assert mock_client.post.call_args.kwargs["json"]["messages"] == messages
+    assert mock_client.request.call_args.kwargs["json"]["messages"] == messages

@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from mlflow.gateway.providers.utils import (
     SUPPORTED_ACCEPT_ENCODING,
-    _aiohttp_post,
+    _aiohttp_request,
     proxy_root_url,
     rename_payload_keys,
     send_proxy_request,
@@ -50,12 +50,13 @@ def test_rename_payload_keys_parameterized(payload, mapping, expected):
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_includes_supported_accept_encoding():
+async def test_aiohttp_request_includes_supported_accept_encoding():
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session_cls:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
@@ -66,14 +67,15 @@ async def test_aiohttp_post_includes_supported_accept_encoding():
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_strips_client_content_encoding():
+async def test_aiohttp_request_strips_client_content_encoding():
     # The client's Content-Encoding describes the body it sent, which is decompressed before
     # reaching here, so forwarding it would label the re-serialized JSON as still encoded.
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session_cls:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key", "content-encoding": "zstd"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
@@ -83,48 +85,51 @@ async def test_aiohttp_post_strips_client_content_encoding():
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_uses_timeout_from_env_var(monkeypatch):
+async def test_aiohttp_request_uses_timeout_from_env_var(monkeypatch):
     monkeypatch.setenv("MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS", "2")
 
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
             pass
 
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args.kwargs["timeout"].total == 2
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args.kwargs["timeout"].total == 2
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_never_follows_redirects():
+async def test_aiohttp_request_never_follows_redirects():
     # A redirect from the upstream could otherwise steer the request to an internal host
     # that the SSRF guard never saw.
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
             pass
 
-    assert mock_client.post.call_args.kwargs["allow_redirects"] is False
+    assert mock_client.request.call_args.kwargs["allow_redirects"] is False
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("server_hostname", ["mlflow.example.com", None])
-async def test_aiohttp_post_passes_server_hostname_only_when_set(server_hostname):
+async def test_aiohttp_request_passes_server_hostname_only_when_set(server_hostname):
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={},
             base_url="https://127.0.0.1:5000",
+            method="POST",
             path="/gateway/ep/mlflow/invocations",
             payload={},
             ssrf_protect=False,
@@ -132,7 +137,7 @@ async def test_aiohttp_post_passes_server_hostname_only_when_set(server_hostname
         ):
             pass
 
-    kwargs = mock_client.post.call_args.kwargs
+    kwargs = mock_client.request.call_args.kwargs
     if server_hostname is None:
         assert "server_hostname" not in kwargs
     else:
@@ -140,12 +145,13 @@ async def test_aiohttp_post_passes_server_hostname_only_when_set(server_hostname
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_rejects_server_hostname_with_ssrf_protection():
+async def test_aiohttp_request_rejects_server_hostname_with_ssrf_protection():
     with mock.patch("aiohttp.ClientSession") as mock_session_cls:
         with pytest.raises(ValueError, match="ssrf_protect is False"):
-            async with _aiohttp_post(
+            async with _aiohttp_request(
                 headers={},
                 base_url="https://api.example.com",
+                method="POST",
                 path="/v1/chat",
                 payload={},
                 ssrf_protect=True,
@@ -157,12 +163,13 @@ async def test_aiohttp_post_rejects_server_hostname_with_ssrf_protection():
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_sets_read_bufsize_for_large_sse_lines():
+async def test_aiohttp_request_sets_read_bufsize_for_large_sse_lines():
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session_cls:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
@@ -243,16 +250,21 @@ async def test_send_stream_request_preserves_upstream_error_message(error_body, 
     response = _FailingResponse(json_body=error_body)
     with (
         mock.patch(
-            "mlflow.gateway.providers.utils._aiohttp_post",
+            "mlflow.gateway.providers.utils._aiohttp_request",
             side_effect=lambda *args, **kwargs: _upstream(response),
-        ) as mock_post,
+        ) as mock_request,
         pytest.raises(HTTPException, match=re.escape(expected_detail)) as exc_info,
     ):
-        [chunk async for chunk in send_stream_request({}, "https://api.example.com", "chat", {})]
+        [
+            chunk
+            async for chunk in send_stream_request(
+                {}, "https://api.example.com", "POST", "chat", {}
+            )
+        ]
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == expected_detail
-    mock_post.assert_called_once()
+    mock_request.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -260,16 +272,21 @@ async def test_send_stream_request_falls_back_to_response_text():
     response = _FailingResponse(text_body="<html>Bad Gateway</html>", status=502)
     with (
         mock.patch(
-            "mlflow.gateway.providers.utils._aiohttp_post",
+            "mlflow.gateway.providers.utils._aiohttp_request",
             side_effect=lambda *args, **kwargs: _upstream(response),
-        ) as mock_post,
+        ) as mock_request,
         pytest.raises(HTTPException, match="Bad Gateway") as exc_info,
     ):
-        [chunk async for chunk in send_stream_request({}, "https://api.example.com", "chat", {})]
+        [
+            chunk
+            async for chunk in send_stream_request(
+                {}, "https://api.example.com", "POST", "chat", {}
+            )
+        ]
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "<html>Bad Gateway</html>"
-    mock_post.assert_called_once()
+    mock_request.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -287,15 +304,20 @@ async def test_send_stream_request_falls_back_to_reason_phrase(json_body, text_b
     response = _FailingResponse(json_body=json_body, text_body=text_body)
     with (
         mock.patch(
-            "mlflow.gateway.providers.utils._aiohttp_post",
+            "mlflow.gateway.providers.utils._aiohttp_request",
             side_effect=lambda *args, **kwargs: _upstream(response),
-        ) as mock_post,
+        ) as mock_request,
         pytest.raises(HTTPException, match="Bad Request") as exc_info,
     ):
-        [chunk async for chunk in send_stream_request({}, "https://api.example.com", "chat", {})]
+        [
+            chunk
+            async for chunk in send_stream_request(
+                {}, "https://api.example.com", "POST", "chat", {}
+            )
+        ]
 
     assert exc_info.value.detail == "Bad Request"
-    mock_post.assert_called_once()
+    mock_request.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -303,13 +325,15 @@ async def test_send_proxy_request_preserves_upstream_error_message():
     response = _FailingResponse(json_body={"message": "model is not enabled in this region"})
     with (
         mock.patch(
-            "mlflow.gateway.providers.utils._aiohttp_post",
+            "mlflow.gateway.providers.utils._aiohttp_request",
             side_effect=lambda *args, **kwargs: _upstream(response),
-        ) as mock_post,
+        ) as mock_request,
         pytest.raises(HTTPException, match="model is not enabled in this region") as exc_info,
     ):
-        await send_proxy_request({}, "https://api.example.com", "v1/messages", {}).__anext__()
+        await send_proxy_request(
+            {}, "https://api.example.com", "POST", "v1/messages", {}
+        ).__anext__()
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "model is not enabled in this region"
-    mock_post.assert_called_once()
+    mock_request.assert_called_once()

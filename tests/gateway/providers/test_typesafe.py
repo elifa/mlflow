@@ -138,6 +138,7 @@ async def test_passthrough(provider, question, answer):
     send.assert_awaited_once_with(
         headers={"Authorization": "Bearer typesafe-test-key"},
         base_url="https://api.typesafe.ai/v1",
+        method="POST",
         path="systemone",
         payload={
             "model": "jev-1.13.0",
