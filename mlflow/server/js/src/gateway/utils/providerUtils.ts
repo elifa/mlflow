@@ -41,6 +41,7 @@ const PROVIDER_DISPLAY_NAMES = {
   deepseek: 'DeepSeek',
   openrouter: 'OpenRouter',
   ollama: 'Ollama',
+  'github-copilot': 'GitHub Copilot',
 } satisfies Record<string, string>;
 
 export function formatProviderName(provider: string): string {

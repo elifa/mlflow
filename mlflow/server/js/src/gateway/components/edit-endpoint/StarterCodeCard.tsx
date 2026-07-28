@@ -224,6 +224,13 @@ claude`,
 
 gemini`,
       };
+    case 'github-copilot':
+      return {
+        description: 'Set the environment variable below, then run `copilot` as usual.',
+        bash: `export COPILOT_API_URL="${base}/gateway/proxy/${endpointName}"
+
+copilot`,
+      };
   }
 };
 

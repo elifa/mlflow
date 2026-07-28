@@ -18,6 +18,8 @@ import AnthropicLogo from '../../../common/static/logos/anthropic.svg';
 import AnthropicLogoDark from '../../../common/static/logos/anthropic-dark.png';
 import GeminiLogo from '../../../common/static/logos/gemini.png';
 import DatabricksLogo from '../../../common/static/logos/databricks.svg';
+import CopilotLogo from '../../../common/static/logos/copilot.svg';
+import CopilotLogoDark from '../../../common/static/logos/copilot-dark.svg';
 
 interface CodingAgentDoc {
   name: string;
@@ -316,6 +318,14 @@ const CODING_AGENTS: CodingAgentDoc[] = [
     logo: GeminiLogo,
     codingAgent: 'gemini-cli',
     componentId: 'mlflow.gateway.quick_start.coding_agent.gemini-cli',
+  },
+  {
+    name: 'GitHub Copilot',
+    provider: 'github-copilot',
+    logo: CopilotLogo,
+    logoDark: CopilotLogoDark,
+    codingAgent: 'github-copilot',
+    componentId: 'mlflow.gateway.quick_start.coding_agent.github-copilot',
   },
 ];
 

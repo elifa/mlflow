@@ -160,7 +160,7 @@ export interface SetEndpointTagRequest {
 export type SetEndpointTagResponse = Record<string, never>;
 
 /** Identifies the coding agent associated with an endpoint (stored as a tag). */
-export type CodingAgentType = 'claude-code' | 'codex' | 'gemini-cli';
+export type CodingAgentType = 'claude-code' | 'codex' | 'gemini-cli' | 'github-copilot';
 
 export interface CreateEndpointRequest {
   name?: string;
