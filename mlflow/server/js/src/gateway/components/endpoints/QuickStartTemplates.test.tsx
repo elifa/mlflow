@@ -87,8 +87,8 @@ describe('QuickStartTemplates', () => {
 
     const links = screen.getAllByRole('link');
     const cardLinks = links.filter((link) => link.getAttribute('href') === '/gateway/endpoints/create');
-    // 4 providers × 4 models + 3 coding agents + 1 browse all link = 20
-    expect(cardLinks.length).toBe(20);
+    // 4 providers × 4 models + 4 coding agents + 1 browse all link = 21
+    expect(cardLinks.length).toBe(21);
   });
 
   it.each([
@@ -120,6 +120,7 @@ describe('QuickStartTemplates', () => {
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('OpenAI Codex')).toBeInTheDocument();
     expect(screen.getByText('Gemini CLI')).toBeInTheDocument();
+    expect(screen.getByText('GitHub Copilot')).toBeInTheDocument();
   });
 
   it('renders the browse all providers link', () => {
@@ -156,8 +157,8 @@ describe('QuickStartTemplatesCompact', () => {
 
     const links = screen.getAllByRole('link');
     const cardLinks = links.filter((link) => link.getAttribute('href') === '/gateway/endpoints/create');
-    // 4 providers × 4 models + 3 coding agents + 1 browse all link = 20
-    expect(cardLinks.length).toBe(20);
+    // 4 providers × 4 models + 4 coding agents + 1 browse all link = 21
+    expect(cardLinks.length).toBe(21);
   });
 
   it('renders coding agents section with links to documentation', () => {
@@ -167,5 +168,6 @@ describe('QuickStartTemplatesCompact', () => {
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('OpenAI Codex')).toBeInTheDocument();
     expect(screen.getByText('Gemini CLI')).toBeInTheDocument();
+    expect(screen.getByText('GitHub Copilot')).toBeInTheDocument();
   });
 });

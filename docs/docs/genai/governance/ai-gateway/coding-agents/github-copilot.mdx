@@ -19,7 +19,9 @@ Route the [GitHub Copilot CLI](https://github.com/github/copilot-cli) through th
 
 ## Step 1: Create a GitHub Copilot Endpoint
 
-Navigate to the **AI Gateway** tab at `http://localhost:5000/#/gateway` and create a new endpoint. Select **GitHub Copilot** (`github-copilot`) as the provider and name the endpoint `github-copilot` — you can change the name, but make sure to use the same name in the next step.
+Navigate to the **AI Gateway** tab at `http://localhost:5000/#/gateway` and click **GitHub Copilot** in the quick start. Then click "create" to create an endpoint. The endpoint name is pre-filled as `github-copilot` — you can change it, but make sure to use the same name in the next step.
+
+No API key is required: every request is authenticated with the caller's own Copilot subscription.
 
 The endpoint defaults to the Copilot API base `https://api.githubcopilot.com`. For GitHub Enterprise, use `https://api.enterprise.githubcopilot.com`.
 

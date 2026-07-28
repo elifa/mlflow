@@ -44,6 +44,7 @@ const PROVIDER_DISPLAY_NAMES = {
   ollama: 'Ollama',
   typesafe: 'TypeSafe',
   sap: 'SAP AI Core',
+  'github-copilot': 'GitHub Copilot',
 } satisfies Record<string, string>;
 
 export function formatProviderName(provider: string): string {
