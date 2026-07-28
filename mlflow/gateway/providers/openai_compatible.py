@@ -372,7 +372,9 @@ class OpenAICompatibleProvider(BaseProvider):
         supports_streaming = action != PassthroughAction.OPENAI_EMBEDDINGS
 
         if supports_streaming and payload_with_model.get("stream"):
-            if self._enable_tracing:
+            # Only the OpenAI chat shape accepts stream_options; the Responses and Anthropic
+            # shapes reject the field outright.
+            if self._enable_tracing and action == PassthroughAction.OPENAI_CHAT:
                 if payload_with_model.get("stream_options") is None:
                     payload_with_model["stream_options"] = {"include_usage": True}
                 elif "include_usage" not in payload_with_model["stream_options"]:

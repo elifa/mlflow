@@ -70,6 +70,7 @@ class Provider(str, Enum):
     PORTKEY = "portkey"
     SAP_AI_CORE = "sap-ai-core"
     TYPESAFE = "typesafe"
+    GITHUB_COPILOT = "github-copilot"
 
     @classmethod
     def values(cls):
