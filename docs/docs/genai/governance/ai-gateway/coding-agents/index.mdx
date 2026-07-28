@@ -1,15 +1,15 @@
 ---
 title: Coding Agents & Long-Running Agents
-description: Use Claude Code, OpenAI Codex, Gemini CLI, and Hermes Agent with the MLflow AI Gateway for centralized observability and governance.
+description: Use Claude Code, OpenAI Codex, Gemini CLI, GitHub Copilot, and Hermes Agent with the MLflow AI Gateway for centralized observability and governance.
 ---
 
 import TilesGrid from "@site/src/components/TilesGrid";
 import TileCard from "@site/src/components/TileCard";
-import { BarChart3, DollarSign, Shield } from "lucide-react";
+import { BarChart3, DollarSign, Github, Shield } from "lucide-react";
 
 # Coding Agents & Long-Running Agents
 
-The MLflow AI Gateway supports popular AI coding agents such as **Claude Code**, **OpenAI Codex**, and **Gemini CLI**, as well as long-running agent runtimes like **Hermes Agent**.
+The MLflow AI Gateway supports popular AI coding agents such as **Claude Code**, **OpenAI Codex**, **Gemini CLI**, and **GitHub Copilot**, as well as long-running agent runtimes like **Hermes Agent**.
 
 Coding agents and long-running agent runtimes can make dozens or hundreds of LLM calls per session, often running autonomously for extended periods while also invoking tools and managing their own state. Without visibility or controls in place, it's easy to lose track of what they're doing, how much they're spending, and whether they're operating within your organization's policies. Routing these agents through the gateway gives your team three key capabilities:
 
@@ -66,6 +66,13 @@ Coding agents and long-running agent runtimes can make dozens or hundreds of LLM
     description="Route Gemini CLI through the gateway using your Google subscription"
     href="./gemini-cli"
     linkText="Set up Gemini CLI →"
+  />
+  <TileCard
+    icon={Github}
+    title="GitHub Copilot"
+    description="Route the GitHub Copilot CLI through the gateway using your GitHub Copilot subscription"
+    href="./github-copilot"
+    linkText="Set up GitHub Copilot →"
   />
   <TileCard
     image="/images/logos/hermes-agent-logo.svg"

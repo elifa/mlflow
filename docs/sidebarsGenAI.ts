@@ -1172,6 +1172,11 @@ const sidebarsGenAI: SidebarsConfig = {
             },
             {
               type: 'doc',
+              id: 'governance/ai-gateway/coding-agents/github-copilot',
+              label: 'GitHub Copilot',
+            },
+            {
+              type: 'doc',
               id: 'governance/ai-gateway/coding-agents/hermes-agent',
               label: 'Hermes Agent',
             },
