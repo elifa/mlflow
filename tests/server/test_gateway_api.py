@@ -31,6 +31,8 @@ from mlflow.gateway.config import (
     OpenAIAPIType,
     OpenAIConfig,
     PortkeyConfig,
+    Provider,
+    _OpenAICompatibleConfig,
 )
 from mlflow.gateway.constants import MLFLOW_GATEWAY_DURATION_HEADER, MLFLOW_GATEWAY_OVERHEAD_HEADER
 from mlflow.gateway.guardrails import _SANITIZE_BYPASS_HEADER, JudgeGuardrail
@@ -103,12 +105,13 @@ def create_mock_request(
     return mock_request
 
 
-def _make_model_config(provider="openai", model_name="gpt-4o"):
+def _make_model_config(provider="openai", model_name="gpt-4o", auth_config=None):
     return GatewayModelConfig(
         model_definition_id="md-test",
         provider=provider,
         model_name=model_name,
         secret_value={"api_key": "sk-test"},
+        auth_config=auth_config,
     )
 
 
@@ -132,6 +135,31 @@ def test_build_endpoint_config_allows_provider_when_no_filter():
         "test-ep", _make_model_config("openai"), EndpointType.LLM_V1_CHAT
     )
     assert config.name == "test-ep"
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [
+        Provider.GROQ,
+        Provider.DEEPSEEK,
+        Provider.XAI,
+        Provider.OPENROUTER,
+        Provider.OLLAMA,
+        Provider.GITHUB_COPILOT,
+    ],
+)
+@pytest.mark.parametrize("api_base", [None, "https://custom.example.com"])
+def test_build_endpoint_config_openai_compatible_providers(provider, api_base):
+    model_config = _make_model_config(
+        provider.value,
+        auth_config={"api_base": api_base} if api_base else None,
+    )
+    config = _build_endpoint_config("test-ep", model_config, EndpointType.LLM_V1_CHAT)
+
+    assert isinstance(config.model.config, _OpenAICompatibleConfig)
+    assert config.model.config.api_key == "sk-test"
+    assert config.model.config.api_base == api_base
+    assert config.model.provider == provider
 
 
 def test_create_provider_from_endpoint_name_openai(store: SqlAlchemyStore):

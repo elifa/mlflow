@@ -100,8 +100,44 @@ def parsed_completions_response():
             },
             True,
         ),
+        # GitHub Copilot CLI (linux-x64) variant
+        (
+            {
+                "user-agent": "copilot-linux-x64/1.0.75 (linux v24.18.0) term/vscode",
+                "authorization": "Bearer key",
+            },
+            True,
+        ),
+        # GitHub Copilot CLI (darwin-arm64) variant
+        (
+            {
+                "user-agent": "copilot-darwin-arm64/1.0.75 (darwin v24.18.0) term/iTerm.app",
+                "authorization": "Bearer key",
+            },
+            True,
+        ),
+        # VS Code's built-in Copilot Chat
+        (
+            {
+                "user-agent": "GitHubCopilotChat/0.32.1",
+                "authorization": "Bearer key",
+            },
+            True,
+        ),
         # Known CLI tool but no auth header → False
         ({"user-agent": "claude-cli/2.0.37 (external, cli)"}, False),
+        ({"user-agent": "copilot-linux-x64/1.0.75 (linux v24.18.0) term/vscode"}, False),
+        ({"user-agent": "GitHubCopilotChat/0.32.1"}, False),
+        # An unrecognised build target still matches the "copilot-" prefix. Matching too
+        # widely only means the client's own token is used instead of the server key, so
+        # this errs in the safe direction.
+        (
+            {
+                "user-agent": "copilot-linux-riscv64/2.0.0 (linux v24.18.0)",
+                "authorization": "Bearer key",
+            },
+            True,
+        ),
         # Unknown user-agent with auth header → False
         ({"user-agent": "python-httpx/0.27.0", "authorization": "Bearer key"}, False),
         # Empty / missing headers → False

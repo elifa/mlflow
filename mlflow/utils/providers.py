@@ -785,6 +785,30 @@ _PROVIDER_AUTH_MODES: dict[str, dict[str, AuthModeDict]] = {
             ],
         },
     },
+    "github-copilot": {
+        "end_user_credentials": {
+            "display_name": "End-User Credentials",
+            "description": "Each developer authenticates with their own GitHub Copilot "
+            "subscription. The client's token is forwarded upstream, so no server-side "
+            "key is required.",
+            "default": True,
+            "fields": [
+                {
+                    "name": "api_key",
+                    "description": "GitHub Copilot API Key (only used for callers that do "
+                    "not supply their own credentials)",
+                    "secret": True,
+                    "required": False,
+                },
+                {
+                    "name": "api_base",
+                    "description": "GitHub Copilot API Base URL",
+                    "secret": False,
+                    "required": False,
+                },
+            ],
+        },
+    },
 }
 
 _BEDROCK_PROVIDERS = {"bedrock", "bedrock_converse"}

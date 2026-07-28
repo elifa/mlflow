@@ -46,6 +46,7 @@ def _register_default_providers(registry: ProviderRegistry):
     from mlflow.gateway.providers.databricks import DatabricksProvider
     from mlflow.gateway.providers.deepseek import DeepSeekProvider
     from mlflow.gateway.providers.gemini import GeminiProvider
+    from mlflow.gateway.providers.github_copilot import GitHubCopilotProvider
     from mlflow.gateway.providers.groq import GroqProvider
     from mlflow.gateway.providers.huggingface import HFTextGenerationInferenceServerProvider
     from mlflow.gateway.providers.litellm import LiteLLMProvider
@@ -72,6 +73,7 @@ def _register_default_providers(registry: ProviderRegistry):
     registry.register(Provider.DATABRICKS_MODEL_SERVING, DatabricksProvider)
     registry.register(Provider.DEEPSEEK, DeepSeekProvider)
     registry.register(Provider.GEMINI, GeminiProvider)
+    registry.register(Provider.GITHUB_COPILOT, GitHubCopilotProvider)
     registry.register(Provider.GROQ, GroqProvider)
     registry.register(
         Provider.HUGGINGFACE_TEXT_GENERATION_INFERENCE, HFTextGenerationInferenceServerProvider
