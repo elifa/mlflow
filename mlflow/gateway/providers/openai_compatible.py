@@ -263,6 +263,7 @@ class OpenAICompatibleProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self._api_base,
+            method="POST",
             path="chat/completions",
             payload=self.adapter_class.chat_to_model(payload_dict, self.config),
         )
@@ -284,6 +285,7 @@ class OpenAICompatibleProvider(BaseProvider):
         stream = send_stream_request(
             headers=self.headers,
             base_url=self._api_base,
+            method="POST",
             path="chat/completions",
             payload=self.adapter_class.chat_to_model(payload_dict, self.config),
         )
@@ -300,6 +302,7 @@ class OpenAICompatibleProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self._api_base,
+            method="POST",
             path="embeddings",
             payload=self.adapter_class.embeddings_to_model(payload_dict, self.config),
         )
@@ -341,9 +344,15 @@ class OpenAICompatibleProvider(BaseProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         gen = send_proxy_request(
-            self._get_headers(headers), proxy_root_url(self._api_base), path, payload
+            self._get_headers(headers),
+            proxy_root_url(self._api_base),
+            method,
+            path,
+            payload,
         )
         meta = await gen.__anext__()
         if meta["is_streaming"]:
@@ -374,6 +383,7 @@ class OpenAICompatibleProvider(BaseProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self._api_base,
+                method="POST",
                 path=provider_path,
                 payload=payload_with_model,
             )
@@ -382,6 +392,7 @@ class OpenAICompatibleProvider(BaseProvider):
             return await send_request(
                 headers=request_headers,
                 base_url=self._api_base,
+                method="POST",
                 path=provider_path,
                 payload=payload_with_model,
             )

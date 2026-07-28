@@ -141,7 +141,7 @@ async def test_gemini_single_embedding():
     )
 
     with mock.patch(
-        "aiohttp.ClientSession.post",
+        "aiohttp.ClientSession.request",
         return_value=MockAsyncResponse(fake_single_embedding_response()),
     ) as mock_post:
         response = await provider.embeddings(embeddings.RequestPayload(**payload))
@@ -156,6 +156,7 @@ async def test_gemini_single_embedding():
     assert jsonable_encoder(response) == expected_response
 
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -183,7 +184,7 @@ async def test_gemini_batch_embedding():
     expected_url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents"
 
     with mock.patch(
-        "aiohttp.ClientSession.post",
+        "aiohttp.ClientSession.request",
         return_value=MockAsyncResponse(fake_batch_embedding_response()),
     ) as mock_post:
         response = await provider.embeddings(embeddings.RequestPayload(**payload))
@@ -202,6 +203,7 @@ async def test_gemini_batch_embedding():
     assert jsonable_encoder(response) == expected_response
 
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -240,7 +242,7 @@ async def test_gemini_completions():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(fake_completion_response()),
         ) as mock_post,
     ):
@@ -268,6 +270,7 @@ async def test_gemini_completions():
 
     assert jsonable_encoder(response) == expected_response
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -343,7 +346,7 @@ async def test_gemini_chat():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(fake_chat_response()),
         ) as mock_post,
     ):
@@ -375,6 +378,7 @@ async def test_gemini_chat():
 
     assert jsonable_encoder(response) == expected_response
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -393,7 +397,7 @@ async def test_gemini_chat_with_max_completion_tokens():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(fake_chat_response()),
         ) as mock_post,
     ):
@@ -523,7 +527,7 @@ async def test_gemini_chat_function_calling():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(resp),
         ) as mock_post,
     ):
@@ -565,6 +569,7 @@ async def test_gemini_chat_function_calling():
 
     assert jsonable_encoder(response) == expected_response
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -643,7 +648,7 @@ async def test_gemini_chat_multi_function_calling():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(resp),
         ) as mock_post,
     ):
@@ -689,6 +694,7 @@ async def test_gemini_chat_multi_function_calling():
 
     assert jsonable_encoder(response) == expected_response
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=mock.ANY,
         timeout=mock.ANY,
@@ -746,7 +752,7 @@ async def test_gemini_chat_function_calling_second_turn():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(resp),
         ) as mock_post,
     ):
@@ -829,6 +835,7 @@ async def test_gemini_chat_function_calling_second_turn():
     }
 
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -891,7 +898,7 @@ async def test_gemini_chat_function_calling_thought_signature():
     with (
         mock.patch("time.time", return_value=1234567890),
         mock.patch(
-            "aiohttp.ClientSession.post",
+            "aiohttp.ClientSession.request",
             return_value=MockAsyncResponse(resp),
         ) as mock_post,
     ):
@@ -949,6 +956,7 @@ async def test_gemini_chat_function_calling_thought_signature():
     }
 
     mock_post.assert_called_once_with(
+        "POST",
         expected_url,
         json=expected_payload,
         timeout=mock.ANY,
@@ -1042,7 +1050,8 @@ async def test_gemini_chat_stream(resp):
         "gemini-2.0-flash:streamGenerateContent?alt=sse"
     )
 
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         expected_url,
         json=mock.ANY,
         timeout=mock.ANY,
@@ -1113,7 +1122,8 @@ async def test_gemini_chat_function_calling_stream():
         "gemini-2.0-flash:streamGenerateContent?alt=sse"
     )
 
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         expected_url,
         json=mock.ANY,
         timeout=mock.ANY,
@@ -1188,7 +1198,8 @@ async def test_gemini_completions_stream(resp):
         "gemini-2.0-flash:streamGenerateContent?alt=sse"
     )
 
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         expected_url,
         json=mock.ANY,
         timeout=mock.ANY,
@@ -1256,9 +1267,9 @@ async def test_passthrough_gemini_generate_content():
 
         assert response == resp
 
-        mock_session_client.post.assert_called_once()
-        call_args = mock_session_client.post.call_args
-        assert "gemini-2.0-flash:generateContent" in call_args[0][0]
+        mock_session_client.request.assert_called_once()
+        call_args = mock_session_client.request.call_args
+        assert "gemini-2.0-flash:generateContent" in call_args[0][1]
         assert call_args[1]["json"]["contents"] == [{"role": "user", "parts": [{"text": "Hello"}]}]
 
         # Verify provider headers are propagated correctly
@@ -1308,9 +1319,9 @@ async def test_passthrough_gemini_stream_generate_content():
         assert b"How can I help you?" in chunks[2]
         assert b"STOP" in chunks[2]
 
-        mock_session_client.post.assert_called_once()
-        call_args = mock_session_client.post.call_args
-        assert "gemini-2.0-flash:streamGenerateContent?alt=sse" in call_args[0][0]
+        mock_session_client.request.assert_called_once()
+        call_args = mock_session_client.request.call_args
+        assert "gemini-2.0-flash:streamGenerateContent?alt=sse" in call_args[0][1]
         assert call_args[1]["json"]["contents"] == [{"role": "user", "parts": [{"text": "Hello"}]}]
 
         # Verify provider headers are propagated correctly
@@ -1358,7 +1369,7 @@ async def test_chat_with_structured_output():
     }
 
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = GeminiProvider(EndpointConfig(**config))
         payload = {
@@ -1413,7 +1424,7 @@ async def test_chat_with_json_object_response_format():
     }
 
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = GeminiProvider(EndpointConfig(**config))
         payload = {
@@ -1462,7 +1473,7 @@ async def test_chat_with_top_k_and_penalties():
     }
 
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = GeminiProvider(EndpointConfig(**config))
         payload = {

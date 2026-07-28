@@ -179,7 +179,7 @@ async def test_chat():
     assert result["choices"][0]["message"]["content"] == "Hello!"
     assert result["usage"]["prompt_tokens"] == 13
 
-    call_args = mock_client.post.call_args
+    call_args = mock_client.request.call_args
     assert "chat/completions" in str(call_args)
 
 
@@ -264,12 +264,14 @@ async def test_proxy_non_streaming():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         result = await provider.proxy(
+            method="POST",
             path="v1/chat/completions",
             payload={"messages": [{"role": "user", "content": "Hello"}]},
         )
 
     assert result["id"] == "chatcmpl-abc123"
-    mock_client.post.assert_called_once_with(
+    mock_client.request.assert_called_once_with(
+        "POST",
         "https://api.test-provider.com/v1/chat/completions",
         json={"messages": [{"role": "user", "content": "Hello"}]},
         timeout=mock.ANY,
@@ -291,6 +293,7 @@ async def test_proxy_streaming():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         result = await provider.proxy(
+            method="POST",
             path="v1/chat/completions",
             payload={
                 "messages": [{"role": "user", "content": "Hello"}],
@@ -320,6 +323,7 @@ async def test_proxy_streaming_detected_from_content_type():
 
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
         result = await provider.proxy(
+            method="POST",
             path="streamGenerateContent",
             payload={"contents": [{"parts": [{"text": "Hello"}]}]},  # no "stream" key
         )
@@ -342,6 +346,7 @@ async def test_proxy_propagates_headers():
 
     with mock.patch("aiohttp.ClientSession", mock_client_session):
         await provider.proxy(
+            method="POST",
             path="chat/completions",
             payload={"messages": [{"role": "user", "content": "Hello"}]},
             headers={"X-Custom": "value", "host": "ignored", "content-length": "0"},
@@ -351,6 +356,54 @@ async def test_proxy_propagates_headers():
     assert captured_headers["X-Custom"] == "value"
     assert "host" not in captured_headers
     assert "content-length" not in captured_headers
+
+
+@pytest.mark.asyncio
+async def test_proxy_get_sends_no_json_body():
+    provider = _make_provider()
+    mock_client = mock_http_client(MockAsyncResponse({"data": [{"id": "gpt-4o"}]}))
+
+    with mock.patch("aiohttp.ClientSession", return_value=mock_client):
+        result = await provider.proxy(method="GET", path="models", payload={})
+
+    assert result["data"] == [{"id": "gpt-4o"}]
+    assert "json" not in mock_client.request.call_args.kwargs
+    mock_client.request.assert_called_once_with(
+        "GET", "https://api.test-provider.com/models", timeout=mock.ANY
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_get_preserves_query_string():
+    provider = _make_provider()
+    mock_client = mock_http_client(MockAsyncResponse({"data": []}))
+
+    with mock.patch("aiohttp.ClientSession", return_value=mock_client):
+        await provider.proxy(method="GET", path="models?limit=5&after=x", payload={})
+
+    mock_client.request.assert_called_once_with(
+        "GET", "https://api.test-provider.com/models?limit=5&after=x", timeout=mock.ANY
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_post_sends_json_body():
+    provider = _make_provider()
+    mock_client = mock_http_client(MockAsyncResponse(_chat_response()))
+
+    with mock.patch("aiohttp.ClientSession", return_value=mock_client):
+        await provider.proxy(
+            method="POST",
+            path="v1/chat/completions",
+            payload={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+    mock_client.request.assert_called_once_with(
+        "POST",
+        "https://api.test-provider.com/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "Hello"}]},
+        timeout=mock.ANY,
+    )
 
 
 # --- adapter tests ---

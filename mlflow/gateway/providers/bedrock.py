@@ -607,6 +607,7 @@ class AmazonBedrockProvider(BaseProvider):
         resp = await send_request(
             headers=self._get_token_auth_headers(),
             base_url=self._get_token_auth_base_url(),
+            method="POST",
             path=f"model/{model_id}/converse",
             payload=kwargs,
         )

@@ -24,7 +24,10 @@ def parse_base64_data_url(url: str) -> tuple[str, str] | None:
     return None
 
 
-_STRIPPED_HEADERS = frozenset({"accept-encoding", MLFLOW_GATEWAY_AUTH_HEADER.lower()})
+_STRIPPED_HEADERS = frozenset({"accept-encoding", "cookie", MLFLOW_GATEWAY_AUTH_HEADER.lower()})
+
+# HTTP methods that must never carry a JSON request body.
+_BODYLESS_METHODS = frozenset({"GET", "HEAD", "DELETE", "OPTIONS"})
 
 # Accumulates the total time (ms) spent waiting for provider HTTP responses in the current
 # request context. Reset to 0.0 at the start of each request by the gateway timing middleware
@@ -37,14 +40,22 @@ SUPPORTED_ACCEPT_ENCODING = "gzip, deflate, identity"
 
 
 @asynccontextmanager
-async def _aiohttp_post(headers: dict[str, str], base_url: str, path: str, payload: dict[str, Any]):
+async def _aiohttp_request(
+    headers: dict[str, str],
+    base_url: str,
+    method: str,
+    path: str,
+    payload: dict[str, Any],
+):
     import aiohttp
+
+    method = method.upper()
 
     # Drop any client Accept-Encoding (any casing) so we send only one value; otherwise
     # aiohttp may send both and upstream can respond with Brotli, which is not supported.
-    # Also drop X-MLflow-Authorization (MLflow's own RBAC credential on gateway routes) so
-    # it is never forwarded to the upstream provider. This is the single egress choke point
-    # all proxy/passthrough paths funnel through.
+    # Also drop X-MLflow-Authorization (MLflow's own RBAC credential on gateway routes) and
+    # Cookie (MLflow session cookies) so neither is ever forwarded to the upstream provider.
+    # This is the single egress choke point all proxy/passthrough paths funnel through.
     request_headers = {k: v for k, v in headers.items() if k.lower() not in _STRIPPED_HEADERS}
     request_headers["Accept-Encoding"] = SUPPORTED_ACCEPT_ENCODING
     url = append_to_uri_path(base_url, path)
@@ -52,17 +63,25 @@ async def _aiohttp_post(headers: dict[str, str], base_url: str, path: str, paylo
     # emitted by some providers during streaming responses.
     async with aiohttp.ClientSession(headers=request_headers, read_bufsize=2**20) as session:
         timeout = aiohttp.ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get())
-        async with session.post(url, json=payload, timeout=timeout) as response:
+        request_kwargs = {} if method in _BODYLESS_METHODS else {"json": payload}
+        async with session.request(method, url, timeout=timeout, **request_kwargs) as response:
             yield response
 
 
-async def send_request(headers: dict[str, str], base_url: str, path: str, payload: dict[str, Any]):
+async def send_request(
+    headers: dict[str, str],
+    base_url: str,
+    method: str,
+    path: str,
+    payload: dict[str, Any],
+):
     """
     Send an HTTP request to a specific URL path with given headers and payload.
 
     Args:
         headers: The headers to include in the request.
         base_url: The base URL where the request will be sent.
+        method: The HTTP method to use. Body-less methods (e.g. ``GET``) ignore ``payload``.
         path: The specific path of the URL to which the request will be sent.
         payload: The payload (or data) to be included in the request.
 
@@ -77,7 +96,7 @@ async def send_request(headers: dict[str, str], base_url: str, path: str, payloa
 
     start = time.perf_counter()
     try:
-        async with _aiohttp_post(headers, base_url, path, payload) as response:
+        async with _aiohttp_request(headers, base_url, method, path, payload) as response:
             content_type = response.headers.get("Content-Type")
             if content_type and "application/json" in content_type:
                 js = await response.json()
@@ -103,7 +122,11 @@ async def send_request(headers: dict[str, str], base_url: str, path: str, payloa
 
 
 async def send_stream_request(
-    headers: dict[str, str], base_url: str, path: str, payload: dict[str, Any]
+    headers: dict[str, str],
+    base_url: str,
+    method: str,
+    path: str,
+    payload: dict[str, Any],
 ) -> AsyncGenerator[bytes, None]:
     """
     Send a streaming HTTP request to a specific URL path with given headers and payload.
@@ -111,6 +134,7 @@ async def send_stream_request(
     Args:
         headers: The headers to include in the request.
         base_url: The base URL where the request will be sent.
+        method: The HTTP method to use. Body-less methods (e.g. ``GET``) ignore ``payload``.
         path: The specific path of the URL to which the request will be sent.
         payload: The payload (or data) to be included in the request.
 
@@ -123,7 +147,7 @@ async def send_stream_request(
     import aiohttp
     from fastapi import HTTPException
 
-    async with _aiohttp_post(headers, base_url, path, payload) as response:
+    async with _aiohttp_request(headers, base_url, method, path, payload) as response:
         try:
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:
@@ -165,6 +189,7 @@ _STREAMING_CONTENT_TYPES = frozenset({"text/event-stream", "application/x-ndjson
 async def send_proxy_request(
     headers: dict[str, str],
     base_url: str,
+    method: str,
     path: str,
     payload: dict[str, Any],
 ) -> AsyncGenerator[dict[str, Any] | bytes, None]:
@@ -179,13 +204,15 @@ async def send_proxy_request(
 
     Callers should consume all items or explicitly call ``aclose()`` to release the
     underlying HTTP connection.
+
+    Body-less methods (e.g. ``GET``) ignore ``payload``.
     """
     import aiohttp
     from fastapi import HTTPException
 
     start = time.perf_counter()
     try:
-        async with _aiohttp_post(headers, base_url, path, payload) as response:
+        async with _aiohttp_request(headers, base_url, method, path, payload) as response:
             try:
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:

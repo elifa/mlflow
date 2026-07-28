@@ -289,6 +289,7 @@ class OpenAIProvider(BaseProvider):
         stream = send_stream_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="chat/completions",
             payload=self.adapter_class.chat_to_model(payload, self.config),
         )
@@ -305,6 +306,7 @@ class OpenAIProvider(BaseProvider):
         return await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="chat/completions",
             payload=self.adapter_class.chat_to_model(payload, self.config),
         )
@@ -348,6 +350,7 @@ class OpenAIProvider(BaseProvider):
             resp = await send_request(
                 headers=self.headers,
                 base_url=self.base_url,
+                method="POST",
                 path="chat/completions",
                 payload=self.adapter_class.chat_to_model(
                     {
@@ -385,6 +388,7 @@ class OpenAIProvider(BaseProvider):
                 resp = await send_request(
                     headers=self.headers,
                     base_url=self.base_url,
+                    method="POST",
                     path="chat/completions",
                     payload=self.adapter_class.chat_to_model(
                         {
@@ -470,6 +474,7 @@ class OpenAIProvider(BaseProvider):
             resp = await send_request(
                 headers=self.headers,
                 base_url=self.base_url,
+                method="POST",
                 path="chat/completions",
                 payload=self.adapter_class.chat_to_model(payload, self.config),
             )
@@ -512,6 +517,7 @@ class OpenAIProvider(BaseProvider):
         stream = send_stream_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="completions",
             payload=OpenAIAdapter.completion_to_model(payload, self.config),
         )
@@ -529,6 +535,7 @@ class OpenAIProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="completions",
             payload=OpenAIAdapter.completion_to_model(payload, self.config),
         )
@@ -542,6 +549,7 @@ class OpenAIProvider(BaseProvider):
         resp = await send_request(
             headers=self.headers,
             base_url=self.base_url,
+            method="POST",
             path="embeddings",
             payload=OpenAIAdapter.embeddings_to_model(payload, self.config),
         )
@@ -625,9 +633,15 @@ class OpenAIProvider(BaseProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         gen = send_proxy_request(
-            self._get_headers(None, headers), proxy_root_url(self.base_url), path, payload
+            self._get_headers(None, headers),
+            proxy_root_url(self.base_url),
+            method,
+            path,
+            payload,
         )
         meta = await gen.__anext__()
         if meta["is_streaming"]:
@@ -662,6 +676,7 @@ class OpenAIProvider(BaseProvider):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload_with_model,
             )
@@ -670,6 +685,7 @@ class OpenAIProvider(BaseProvider):
             return await send_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload_with_model,
             )

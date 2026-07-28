@@ -219,9 +219,9 @@ async def test_passthrough_openai_chat():
         )
 
     assert result["id"] == "chatcmpl-db-123"
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert call_args[0][0] == (
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
+    assert call_args[0][1] == (
         "https://my-workspace.databricks.com/serving-endpoints/chat/completions"
     )
 
@@ -248,9 +248,9 @@ async def test_passthrough_openai_chat_streaming():
         collected = [chunk async for chunk in result]
 
     assert len(collected) > 0
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert call_args[0][0] == (
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
+    assert call_args[0][1] == (
         "https://my-workspace.databricks.com/serving-endpoints/chat/completions"
     )
 
@@ -267,9 +267,9 @@ async def test_passthrough_openai_embeddings():
         )
 
     assert result["data"][0]["embedding"] == [0.1, 0.2, 0.3]
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert call_args[0][0] == ("https://my-workspace.databricks.com/serving-endpoints/embeddings")
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
+    assert call_args[0][1] == ("https://my-workspace.databricks.com/serving-endpoints/embeddings")
 
 
 @pytest.mark.asyncio
@@ -293,9 +293,9 @@ async def test_passthrough_anthropic_messages():
         )
 
     assert result["id"] == "msg-123"
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert call_args[0][0] == (
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
+    assert call_args[0][1] == (
         "https://my-workspace.databricks.com/serving-endpoints/anthropic/v1/messages"
     )
 
@@ -322,10 +322,10 @@ async def test_passthrough_gemini_generate_content():
         )
 
     assert result["candidates"][0]["content"]["parts"][0]["text"] == "Hello!"
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
     # {model} should be formatted with the actual model name
-    assert call_args[0][0] == (
+    assert call_args[0][1] == (
         "https://my-workspace.databricks.com/serving-endpoints/"
         "gemini/v1beta/models/databricks-dbrx-instruct:generateContent"
     )
@@ -346,9 +346,9 @@ async def test_passthrough_gemini_streaming():
         collected = [chunk async for chunk in result]
 
     assert len(collected) > 0
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert call_args[0][0] == (
+    mock_client.request.assert_called_once()
+    call_args = mock_client.request.call_args
+    assert call_args[0][1] == (
         "https://my-workspace.databricks.com/serving-endpoints/"
         "gemini/v1beta/models/databricks-dbrx-instruct:streamGenerateContent"
     )

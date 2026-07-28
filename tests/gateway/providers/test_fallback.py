@@ -65,7 +65,7 @@ async def test_fallback_chat_second_provider_succeeds():
 
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             MockAsyncResponse(resp),
         ]
@@ -78,7 +78,7 @@ async def test_fallback_chat_second_provider_succeeds():
         response = await provider.chat(payload)
         assert response.choices[0].message.content == "\n\nThis is a test!"
         # Verify we tried twice (first failed, second succeeded)
-        assert mock_client.post.call_count == 2
+        assert mock_client.request.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -93,7 +93,7 @@ async def test_fallback_chat_all_providers_fail():
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_client = mock_http_client(MockAsyncResponse({}))
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             Exception("Second provider failed"),
         ]
@@ -107,7 +107,7 @@ async def test_fallback_chat_all_providers_fail():
             await provider.chat(payload)
 
         # Verify we tried both providers
-        assert mock_client.post.call_count == 2
+        assert mock_client.request.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_fallback_chat_max_attempts():
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_client = mock_http_client(MockAsyncResponse({}))
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             Exception("Second provider failed"),
             Exception("Third provider failed"),
@@ -140,7 +140,7 @@ async def test_fallback_chat_max_attempts():
             await provider.chat(payload)
 
         # Verify we only tried 2 providers (max_attempts=2)
-        assert mock_client.post.call_count == 2
+        assert mock_client.request.call_count == 2
 
 
 @pytest.mark.parametrize("resp", [chat_stream_response(), chat_stream_response_incomplete()])
@@ -165,7 +165,7 @@ async def test_fallback_chat_stream_with_fallback():
     # Mock the first provider to fail and second to succeed
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             MockAsyncStreamingResponse(resp),
         ]
@@ -179,7 +179,7 @@ async def test_fallback_chat_stream_with_fallback():
         chunks = [chunk async for chunk in provider.chat_stream(payload)]
 
         assert len(chunks) > 0
-        assert mock_client.post.call_count == 2
+        assert mock_client.request.call_count == 2
 
 
 @pytest.mark.parametrize("resp", [completions_response(), chat_response()])
@@ -236,7 +236,7 @@ async def test_fallback_embeddings_with_fallback():
     # Mock the first provider to fail and second to succeed
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             MockAsyncResponse(embedding_response),
         ]
@@ -246,7 +246,7 @@ async def test_fallback_embeddings_with_fallback():
 
         assert response.data[0].embedding == [0.1, 0.2, 0.3]
         # Verify we tried twice (first failed, second succeeded)
-        assert mock_client.post.call_count == 2
+        assert mock_client.request.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -304,7 +304,7 @@ async def test_fallback_provider_propagates_http_status(exception, expected_stat
     with mock.patch("aiohttp.ClientSession") as mock_session:
         mock_client = mock_http_client(MockAsyncResponse({}))
         mock_session.return_value = mock_client
-        mock_client.post.side_effect = [
+        mock_client.request.side_effect = [
             Exception("First provider failed"),
             exception,
         ]

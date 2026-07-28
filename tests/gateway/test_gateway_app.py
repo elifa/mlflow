@@ -235,7 +235,7 @@ def test_dynamic_route():
         "headers": {"Content-Type": "application/json"},
     }
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         for name in ["chat", "traffic_route"]:
             resp = client.post(

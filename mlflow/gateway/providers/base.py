@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, AsyncIterable
@@ -15,6 +16,18 @@ from mlflow.gateway.schemas import chat, completions, embeddings
 from mlflow.tracing.constant import SpanAttributeKey, TokenUsageKey
 from mlflow.tracing.fluent import start_span_no_context
 from mlflow.utils.annotations import developer_stable
+
+
+def _proxy_method_kwargs(provider: "BaseProvider", method: str) -> dict[str, str]:
+    """Return the ``method`` kwarg only when the provider's ``_proxy`` accepts it.
+
+    Third-party providers registered through the ``mlflow.gateway.providers`` entry point may
+    still implement the pre-``method`` signature, which only ever issued POST requests.
+    """
+    params = inspect.signature(provider._proxy).parameters
+    if "method" in params or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return {"method": method}
+    return {}
 
 
 class PassthroughAction(str, Enum):
@@ -186,6 +199,8 @@ class BaseProvider(ABC):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         raise AIGatewayException(
             status_code=501,
@@ -275,12 +290,15 @@ class BaseProvider(ABC):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
+        proxy_kwargs = _proxy_method_kwargs(self, method)
         if not self._enable_tracing:
-            return await self._proxy(path, payload, headers)
+            return await self._proxy(path, payload, headers, **proxy_kwargs)
 
         try:
-            result = await self._proxy(path, payload, headers)
+            result = await self._proxy(path, payload, headers, **proxy_kwargs)
             if isinstance(result, AsyncIterable):
 
                 @mlflow.trace(span_type=SpanType.LLM, name=self._get_span_name())
@@ -689,9 +707,11 @@ class TrafficRouteProvider(BaseProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         prov = self._get_provider()
-        return await prov.proxy(path, payload, headers)
+        return await prov.proxy(path, payload, headers, method=method)
 
 
 class FallbackProvider(BaseProvider):
@@ -841,8 +861,10 @@ class FallbackProvider(BaseProvider):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
-        return await self._execute_with_fallback("proxy", path, payload, headers)
+        return await self._execute_with_fallback("proxy", path, payload, headers, method=method)
 
 
 class ProviderAdapter(ABC):

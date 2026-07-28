@@ -4,7 +4,7 @@ import pytest
 
 from mlflow.gateway.providers.utils import (
     SUPPORTED_ACCEPT_ENCODING,
-    _aiohttp_post,
+    _aiohttp_request,
     proxy_root_url,
     rename_payload_keys,
 )
@@ -44,12 +44,13 @@ def test_rename_payload_keys_parameterized(payload, mapping, expected):
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_includes_supported_accept_encoding():
+async def test_aiohttp_request_includes_supported_accept_encoding():
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session_cls:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
@@ -60,30 +61,32 @@ async def test_aiohttp_post_includes_supported_accept_encoding():
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_uses_timeout_from_env_var(monkeypatch):
+async def test_aiohttp_request_uses_timeout_from_env_var(monkeypatch):
     monkeypatch.setenv("MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS", "2")
 
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client):
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):
             pass
 
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args.kwargs["timeout"].total == 2
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args.kwargs["timeout"].total == 2
 
 
 @pytest.mark.asyncio
-async def test_aiohttp_post_sets_read_bufsize_for_large_sse_lines():
+async def test_aiohttp_request_sets_read_bufsize_for_large_sse_lines():
     mock_client = mock_http_client(MockAsyncResponse({}))
     with mock.patch("aiohttp.ClientSession", return_value=mock_client) as mock_session_cls:
-        async with _aiohttp_post(
+        async with _aiohttp_request(
             headers={"Authorization": "Bearer key"},
             base_url="https://api.example.com",
+            method="POST",
             path="/v1/chat",
             payload={"model": "x"},
         ):

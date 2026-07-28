@@ -134,7 +134,7 @@ async def test_uc_functions(monkeypatch):
     }
 
     mock_client_session = MockHttpClient()
-    mock_client_session.post.side_effect = [
+    mock_client_session.request.side_effect = [
         MockAsyncResponse(first_resp),
         MockAsyncResponse(second_resp),
     ]
@@ -189,7 +189,7 @@ async def test_uc_functions(monkeypatch):
             ],
         }
         response = await provider.chat(chat.RequestPayload(**payload))
-        assert mock_client_session.post.call_count == 2
+        assert mock_client_session.request.call_count == 2
 
         assert jsonable_encoder(response) == {
             "id": "chatcmpl-abc123",
@@ -303,7 +303,7 @@ async def test_uc_functions_user_defined_functions(monkeypatch):
     }
 
     mock_client_session = MockHttpClient()
-    mock_client_session.post.side_effect = [
+    mock_client_session.request.side_effect = [
         MockAsyncResponse(first_resp),
         MockAsyncResponse(second_resp),
     ]
@@ -379,7 +379,7 @@ async def test_uc_functions_user_defined_functions(monkeypatch):
             ],
         }
         response = await provider.chat(chat.RequestPayload(**payload))
-        assert mock_client_session.post.call_count == 1
+        assert mock_client_session.request.call_count == 1
 
         assert jsonable_encoder(response) == {
             "id": "chatcmpl-abc123",

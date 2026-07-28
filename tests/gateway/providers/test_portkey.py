@@ -118,8 +118,8 @@ async def test_chat():
     assert session_headers["x-portkey-api-key"] == "pk-test-key"
     assert session_headers["x-portkey-provider"] == "@openai-prod"
 
-    mock_client.post.assert_called_once()
-    assert mock_client.post.call_args.args[0] == "https://api.portkey.ai/v1/chat/completions"
+    mock_client.request.assert_called_once()
+    assert mock_client.request.call_args.args[1] == "https://api.portkey.ai/v1/chat/completions"
 
 
 def test_configured_upstream_key_wins_over_client_auth():

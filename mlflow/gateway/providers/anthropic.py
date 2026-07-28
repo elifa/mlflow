@@ -603,6 +603,7 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
         stream = send_stream_request(
             headers=headers,
             base_url=self.base_url,
+            method="POST",
             path=self._get_chat_stream_path(),
             payload=payload,
         )
@@ -676,6 +677,7 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
         resp = await send_request(
             headers=headers,
             base_url=self.base_url,
+            method="POST",
             path=self._get_chat_path(),
             payload=payload,
         )
@@ -692,6 +694,7 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
         resp = await send_request(
             headers=self._get_headers(payload),
             base_url=self.base_url,
+            method="POST",
             path="complete",
             payload=AnthropicAdapter.completions_to_model(payload, self.config),
         )
@@ -772,9 +775,15 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
         path: str,
         payload: dict[str, Any],
         headers: dict[str, str] | None = None,
+        *,
+        method: str = "POST",
     ) -> dict[str, Any] | AsyncIterable[Any]:
         gen = send_proxy_request(
-            self._get_headers(payload, headers), proxy_root_url(self.base_url), path, payload
+            self._get_headers(payload, headers),
+            proxy_root_url(self.base_url),
+            method,
+            path,
+            payload,
         )
         meta = await gen.__anext__()
         if meta["is_streaming"]:
@@ -800,6 +809,7 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
             stream = send_stream_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )
@@ -808,6 +818,7 @@ class AnthropicProvider(BaseProvider, AnthropicAdapter):
             return await send_request(
                 headers=request_headers,
                 base_url=self.base_url,
+                method="POST",
                 path=provider_path,
                 payload=payload,
             )

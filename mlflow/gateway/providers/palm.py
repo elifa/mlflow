@@ -29,6 +29,7 @@ class PaLMProvider(BaseProvider):
         return await send_request(
             headers=headers,
             base_url="https://generativelanguage.googleapis.com/v1beta3/models/",
+            method="POST",
             path=path,
             payload=payload,
         )

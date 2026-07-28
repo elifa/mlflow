@@ -77,7 +77,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = HFTextGenerationInferenceServerProvider(EndpointConfig(**config))
         payload = {
@@ -101,6 +103,7 @@ async def test_completions():
             "usage": {"prompt_tokens": 4, "completion_tokens": 5, "total_tokens": 9},
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://testserverurl.com/generate",
             json={
                 "inputs": "This is a test",
@@ -119,7 +122,7 @@ async def test_completions_temperature_is_scaled_correctly():
     resp = completions_response()
     config = completions_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = HFTextGenerationInferenceServerProvider(EndpointConfig(**config))
         payload = {

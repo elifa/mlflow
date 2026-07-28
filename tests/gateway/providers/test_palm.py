@@ -48,7 +48,9 @@ async def test_completions():
     config = completions_config()
     with (
         mock.patch("time.time", return_value=1677858242),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = PaLMProvider(EndpointConfig(**config))
         payload = {
@@ -73,6 +75,7 @@ async def test_completions():
             "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://generativelanguage.googleapis.com/v1beta3/models/text-bison:generateText",
             json={
                 "prompt": {
@@ -91,7 +94,7 @@ async def test_completions_temperature_is_scaled_correctly():
     resp = completions_response()
     config = completions_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
     ) as mock_post:
         provider = PaLMProvider(EndpointConfig(**config))
         payload = {
@@ -169,7 +172,9 @@ async def test_chat(payload, expected_llm_input):
     config = chat_config()
     with (
         mock.patch("time.time", return_value=1700242674),
-        mock.patch("aiohttp.ClientSession.post", return_value=MockAsyncResponse(resp)) as mock_post,
+        mock.patch(
+            "aiohttp.ClientSession.request", return_value=MockAsyncResponse(resp)
+        ) as mock_post,
     ):
         provider = PaLMProvider(EndpointConfig(**config))
         response = await provider.chat(chat.RequestPayload(**payload))
@@ -198,6 +203,7 @@ async def test_chat(payload, expected_llm_input):
             },
         }
         mock_post.assert_called_once_with(
+            "POST",
             "https://generativelanguage.googleapis.com/v1beta3/models/chat-bison:generateMessage",
             json=expected_llm_input,
             timeout=ClientTimeout(total=MLFLOW_GATEWAY_ROUTE_TIMEOUT_SECONDS.get()),
@@ -269,7 +275,7 @@ def embeddings_batch_response():
 async def test_embeddings(prompt):
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(embeddings_response())
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(embeddings_response())
     ) as mock_post:
         provider = PaLMProvider(EndpointConfig(**config))
         payload = {"input": prompt}
@@ -300,7 +306,7 @@ async def test_embeddings(prompt):
 async def test_embeddings_batch():
     config = embeddings_config()
     with mock.patch(
-        "aiohttp.ClientSession.post", return_value=MockAsyncResponse(embeddings_batch_response())
+        "aiohttp.ClientSession.request", return_value=MockAsyncResponse(embeddings_batch_response())
     ) as mock_post:
         provider = PaLMProvider(EndpointConfig(**config))
         payload = {"input": ["this is a", "batch test"]}
