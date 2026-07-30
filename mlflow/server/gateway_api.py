@@ -1592,4 +1592,9 @@ async def raw_proxy(endpoint_name: str, path: str, request: Request):
         return StreamingResponse(
             safe_stream(_prepend(first, gen), as_bytes=True), media_type="text/event-stream"
         )
+    # A non-streaming response is a single yielded dict. Drain the generator anyway: the
+    # tracing wrapper only ends its span once iteration raises StopAsyncIteration, so
+    # abandoning it here would leave the trace IN_PROGRESS forever.
+    async for _ in gen:
+        pass
     return first
