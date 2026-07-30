@@ -3744,11 +3744,15 @@ async def test_guardrail_spans_created_when_usage_tracking_on(store: SqlAlchemyS
 # =============================================================================
 
 
-def _raw_proxy_client(mock_provider, store):
+def _raw_proxy_client(mock_provider, store, experiment_id=None):
     app = FastAPI()
     app.include_router(gateway_router)
     mock_endpoint_config = GatewayEndpointConfig(
-        endpoint_id="test-endpoint-id", endpoint_name="my-endpoint", models=[]
+        endpoint_id="test-endpoint-id",
+        endpoint_name="my-endpoint",
+        models=[],
+        experiment_id=experiment_id,
+        usage_tracking=experiment_id is not None,
     )
     return TestClient(app), [
         patch("mlflow.server.gateway_api._get_store", return_value=store),
@@ -3811,3 +3815,32 @@ def test_raw_proxy_post_unchanged(store: SqlAlchemyStore):
     assert mock_provider.proxy.call_args.kwargs["method"] == "POST"
     assert path == "v1/chat/completions"
     assert body == payload
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "request_kwargs"),
+    [
+        ("GET", "models", {}),
+        ("POST", "v1/chat/completions", {"json": {"model": "gpt-4o", "messages": []}}),
+    ],
+)
+def test_raw_proxy_non_streaming_finalizes_trace(
+    store: SqlAlchemyStore, method: str, path: str, request_kwargs: dict
+):
+    # A non-streaming response is returned without draining the traced generator, which
+    # previously left the trace IN_PROGRESS forever.
+    experiment_id = store.create_experiment(f"gateway/raw-proxy-trace-{method}")
+    mock_provider = MagicMock()
+    mock_provider.proxy = AsyncMock(return_value={"object": "list", "data": []})
+    client, patches = _raw_proxy_client(mock_provider, store, experiment_id=experiment_id)
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        response = client.request(method, f"/gateway/proxy/my-endpoint/{path}", **request_kwargs)
+
+    assert response.status_code == 200
+
+    traces = TracingClient().search_traces(locations=[experiment_id])
+    assert len(traces) == 1
+    assert traces[0].info.state == TraceState.OK
