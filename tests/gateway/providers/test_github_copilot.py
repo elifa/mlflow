@@ -10,6 +10,9 @@ from mlflow.gateway.providers.github_copilot import (
     GitHubCopilotProvider,
 )
 from mlflow.gateway.schemas import chat
+from mlflow.tracing.client import TracingClient
+from mlflow.tracing.constant import SpanAttributeKey, TokenUsageKey
+from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.uri import append_to_uri_path
 
 from tests.gateway.tools import MockAsyncResponse, mock_http_client
@@ -284,3 +287,94 @@ def test_extract_passthrough_token_usage_openai_chat():
 
 def test_default_copilot_headers_constant():
     assert set(_DEFAULT_COPILOT_HEADERS) == {"Copilot-Integration-Id", "X-GitHub-Api-Version"}
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("chat/completions", PassthroughAction.OPENAI_CHAT),
+        ("v1/chat/completions", PassthroughAction.OPENAI_CHAT),
+        ("/chat/completions?stream=true", PassthroughAction.OPENAI_CHAT),
+        ("responses", PassthroughAction.OPENAI_RESPONSES),
+        ("v1/responses", PassthroughAction.OPENAI_RESPONSES),
+        ("v1/messages", PassthroughAction.ANTHROPIC_MESSAGES),
+        ("messages", PassthroughAction.ANTHROPIC_MESSAGES),
+        ("embeddings", PassthroughAction.OPENAI_EMBEDDINGS),
+        ("models", None),
+    ],
+)
+def test_passthrough_action_for_proxy_path(path, expected):
+    assert _make_provider()._passthrough_action_for_path(path) == expected
+
+
+def _mock_proxy_request(*items):
+    def factory(headers, base_url, method, path, payload):
+        async def gen():
+            for item in items:
+                yield item
+
+        return gen()
+
+    return mock.patch(
+        "mlflow.gateway.providers.openai_compatible.send_proxy_request", side_effect=factory
+    )
+
+
+def _traces():
+    return TracingClient().search_traces(locations=[_get_experiment_id()])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["chat/completions", "v1/chat/completions"])
+async def test_proxy_records_token_usage_non_streaming(path):
+    provider = _make_provider()
+    provider._enable_tracing = True
+
+    with _mock_proxy_request({"is_streaming": False}, _chat_response()):
+        result = await provider.proxy(path, {"messages": [{"role": "user", "content": "Hi"}]})
+
+    assert result["id"] == "chatcmpl-copilot-123"
+
+    traces = _traces()
+    assert len(traces) == 1
+    usage = traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE)
+    assert usage[TokenUsageKey.INPUT_TOKENS] == 11
+    assert usage[TokenUsageKey.OUTPUT_TOKENS] == 22
+    assert usage[TokenUsageKey.TOTAL_TOKENS] == 33
+
+
+@pytest.mark.asyncio
+async def test_proxy_records_token_usage_streaming_anthropic_messages():
+    # The Anthropic shape reports usage across two events without any opt-in field.
+    provider = _make_provider()
+    provider._enable_tracing = True
+
+    chunks = [
+        b'data: {"type": "message_start", "message": {"usage": {"input_tokens": 9}}}\n\n',
+        b'data: {"type": "message_delta", "usage": {"output_tokens": 4}}\n\n',
+    ]
+    with _mock_proxy_request({"is_streaming": True}, *chunks):
+        stream = await provider.proxy("v1/messages", {"stream": True})
+        assert [chunk async for chunk in stream] == chunks
+
+    traces = _traces()
+    assert len(traces) == 1
+    usage = traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE)
+    assert usage[TokenUsageKey.INPUT_TOKENS] == 9
+    assert usage[TokenUsageKey.OUTPUT_TOKENS] == 4
+    assert usage[TokenUsageKey.TOTAL_TOKENS] == 13
+
+
+@pytest.mark.asyncio
+async def test_proxy_records_no_token_usage_for_model_discovery():
+    provider = _make_provider()
+    provider._enable_tracing = True
+
+    with _mock_proxy_request({"is_streaming": False}, {"object": "list", "data": []}):
+        result = await provider.proxy("models", {}, method="GET")
+
+    assert result == {"object": "list", "data": []}
+
+    traces = _traces()
+    assert len(traces) == 1
+    assert traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE) is None

@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, AsyncIterable
 from unittest import mock
 
 import pytest
@@ -27,6 +27,8 @@ class MockProvider(BaseProvider):
 
     CONFIG_TYPE = MockConfig
 
+    PASSTHROUGH_PROVIDER_PATHS = {PassthroughAction.OPENAI_CHAT: "chat/completions"}
+
     def __init__(self, enable_tracing: bool = False):
         self.config = mock.MagicMock()
         self.config.model.name = "mock-model"
@@ -39,6 +41,8 @@ class MockProvider(BaseProvider):
         self._embeddings_response = None
         self._passthrough_response = None
         self._passthrough_error = None
+        self._proxy_response = None
+        self._proxy_stream_chunks = None
 
     async def _chat(self, payload: chat.RequestPayload) -> chat.ResponsePayload:
         if self._chat_error:
@@ -63,6 +67,38 @@ class MockProvider(BaseProvider):
         if self._passthrough_error:
             raise self._passthrough_error
         return self._passthrough_response
+
+    async def _proxy(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        headers: dict[str, Any] | None = None,
+        *,
+        method: str = "POST",
+    ) -> dict[str, Any] | AsyncIterable[Any]:
+        if self._proxy_stream_chunks is None:
+            return self._proxy_response
+
+        async def stream():
+            for chunk in self._proxy_stream_chunks:
+                yield chunk
+
+        return stream()
+
+    def _extract_passthrough_token_usage(
+        self, action: PassthroughAction, result: dict[str, Any]
+    ) -> dict[str, int] | None:
+        return self._extract_token_usage_from_dict(
+            result.get("usage"), "prompt_tokens", "completion_tokens", "total_tokens"
+        )
+
+    def _extract_streaming_token_usage(self, chunk: Any) -> dict[str, int]:
+        return (
+            self._extract_token_usage_from_dict(
+                chunk.get("usage"), "prompt_tokens", "completion_tokens", "total_tokens"
+            )
+            or {}
+        )
 
 
 @pytest.fixture
@@ -504,3 +540,88 @@ async def test_passthrough_error_with_tracing(mock_provider):
     assert len(traces) == 1
     trace = traces[0]
     assert trace.info.state == TraceState.ERROR
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("chat/completions", PassthroughAction.OPENAI_CHAT),
+        ("/chat/completions", PassthroughAction.OPENAI_CHAT),
+        ("chat/completions?stream=true", PassthroughAction.OPENAI_CHAT),
+        ("models", None),
+        ("", None),
+    ],
+)
+def test_passthrough_action_for_path(path, expected):
+    assert MockProvider()._passthrough_action_for_path(path) == expected
+
+
+@pytest.mark.asyncio
+async def test_proxy_captures_usage_non_streaming(mock_provider):
+    mock_provider._proxy_response = {
+        "id": "chatcmpl-1",
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+    }
+
+    result = await mock_provider.proxy(
+        "chat/completions", {"messages": [{"role": "user", "content": "Hi"}]}
+    )
+
+    assert result["id"] == "chatcmpl-1"
+
+    traces = get_traces()
+    assert len(traces) == 1
+    assert traces[0].info.state == TraceState.OK
+
+    proxy_span = traces[0].data.spans[0]
+    assert proxy_span.attributes.get("proxy_path") == "chat/completions"
+
+    token_usage = proxy_span.attributes.get(SpanAttributeKey.CHAT_USAGE)
+    assert token_usage is not None
+    assert token_usage[TokenUsageKey.INPUT_TOKENS] == 10
+    assert token_usage[TokenUsageKey.OUTPUT_TOKENS] == 5
+    assert token_usage[TokenUsageKey.TOTAL_TOKENS] == 15
+
+
+@pytest.mark.asyncio
+async def test_proxy_captures_usage_streaming(mock_provider):
+    mock_provider._proxy_stream_chunks = [
+        {"id": "1", "choices": [{"delta": {"content": "Hello"}}]},
+        {
+            "id": "2",
+            "choices": [],
+            "usage": {"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10},
+        },
+    ]
+
+    chunks = await _collect_chunks(
+        await mock_provider.proxy(
+            "chat/completions", {"messages": [{"role": "user", "content": "Hi"}], "stream": True}
+        )
+    )
+
+    assert len(chunks) == 2
+
+    traces = get_traces()
+    assert len(traces) == 1
+    assert traces[0].info.state == TraceState.OK
+
+    token_usage = traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE)
+    assert token_usage is not None
+    assert token_usage[TokenUsageKey.INPUT_TOKENS] == 7
+    assert token_usage[TokenUsageKey.OUTPUT_TOKENS] == 3
+    assert token_usage[TokenUsageKey.TOTAL_TOKENS] == 10
+
+
+@pytest.mark.asyncio
+async def test_proxy_without_matching_action_records_no_usage(mock_provider):
+    mock_provider._proxy_response = {"object": "list", "data": []}
+
+    result = await mock_provider.proxy("models", {}, method="GET")
+
+    assert result == {"object": "list", "data": []}
+
+    traces = get_traces()
+    assert len(traces) == 1
+    assert traces[0].info.state == TraceState.OK
+    assert traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE) is None

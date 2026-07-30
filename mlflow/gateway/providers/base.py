@@ -316,6 +316,7 @@ class BaseProvider(ABC):
         try:
             result = await self._proxy(path, payload, headers, **proxy_kwargs)
             if isinstance(result, AsyncIterable):
+                tracked = self._stream_passthrough_with_usage(result)
 
                 @mlflow.trace(span_type=SpanType.LLM, name=self._get_span_name())
                 async def proxy():
@@ -325,7 +326,7 @@ class BaseProvider(ABC):
                             **self._get_provider_attributes(),
                             "proxy_path": path,
                         })
-                    async for chunk in result:
+                    async for chunk in tracked:
                         yield chunk
 
                 return proxy()
@@ -339,6 +340,11 @@ class BaseProvider(ABC):
                             **self._get_provider_attributes(),
                             "proxy_path": path,
                         })
+                        # Non-inference paths such as model discovery resolve to no action.
+                        if (action := self._passthrough_action_for_path(path)) and (
+                            token_usage := self._extract_passthrough_token_usage(action, result)
+                        ):
+                            span.set_attribute(SpanAttributeKey.CHAT_USAGE, token_usage)
                     return result
 
                 return await proxy()
@@ -598,6 +604,31 @@ class BaseProvider(ABC):
                 f"Supported endpoints: {supported_routes}",
             )
         return provider_path
+
+    def _passthrough_action_for_path(self, path: str) -> PassthroughAction | None:
+        """
+        Resolve a raw proxy path to the passthrough action serving the same provider
+        endpoint, so proxied calls can reuse the action-specific token usage parsing.
+
+        Args:
+            path: The provider path the raw proxy forwards to. It may carry the caller's
+                query string and a leading slash.
+
+        Returns:
+            The matching action, or None when the path is not an inference endpoint
+            (model discovery, for instance).
+        """
+
+        def normalize(value: str) -> str:
+            # Callers reach the same endpoint with or without the API version segment,
+            # depending on whether they treat the gateway URL as the provider's API root.
+            return value.split("?", 1)[0].strip("/").removeprefix("v1/")
+
+        normalized = normalize(path)
+        for action, provider_path in self.PASSTHROUGH_PROVIDER_PATHS.items():
+            if normalize(provider_path) == normalized:
+                return action
+        return None
 
     async def _stream_passthrough_with_usage(
         self, stream: AsyncIterable[Any]
