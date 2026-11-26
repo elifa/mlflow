@@ -196,15 +196,19 @@ def test_extract_passthrough_token_usage_anthropic_messages():
                 "output_tokens": 7,
                 "cache_read_input_tokens": 2,
                 "cache_creation_input_tokens": 3,
+                "cache_creation": {"ephemeral_5m_input_tokens": 2, "ephemeral_1h_input_tokens": 1},
             }
         },
     )
     # Anthropic reports input_tokens excluding cache tokens; they are folded back in.
-    assert usage["input_tokens"] == 10
-    assert usage["output_tokens"] == 7
-    assert usage["total_tokens"] == 17
-    assert usage["cache_read_input_tokens"] == 2
-    assert usage["cache_creation_input_tokens"] == 3
+    assert usage == {
+        "input_tokens": 10,
+        "output_tokens": 7,
+        "total_tokens": 17,
+        "cache_read_input_tokens": 2,
+        "cache_creation_input_tokens": 3,
+        "cache_creation_input_tokens_above_1hr": 1,
+    }
 
 
 def test_extract_passthrough_token_usage_openai_responses():
@@ -251,21 +255,6 @@ def test_extract_streaming_token_usage_openai_responses():
         "output_tokens": 8,
         "total_tokens": 20,
         "cache_read_input_tokens": 4,
-    }
-
-
-def test_extract_streaming_token_usage_anthropic_messages():
-    provider = _make_provider()
-    chunk = (
-        b'data: {"type": "message_start", "message": {"usage": {"input_tokens": 5, '
-        b'"cache_read_input_tokens": 2, "cache_creation_input_tokens": 3}}}\n\n'
-        b'data: {"type": "message_delta", "usage": {"output_tokens": 7}}\n\n'
-    )
-    assert provider._extract_streaming_token_usage(chunk) == {
-        "input_tokens": 10,
-        "output_tokens": 7,
-        "cache_read_input_tokens": 2,
-        "cache_creation_input_tokens": 3,
     }
 
 
@@ -343,26 +332,84 @@ async def test_proxy_records_token_usage_non_streaming(path):
     assert usage[TokenUsageKey.TOTAL_TOKENS] == 33
 
 
+_MESSAGE_START = (
+    b'data: {"type": "message_start", "message": {"usage": {"input_tokens": 9, '
+    b'"cache_read_input_tokens": 2, "cache_creation_input_tokens": 3, '
+    b'"cache_creation": {"ephemeral_1h_input_tokens": 1}}}}\n\n'
+)
+
+
 @pytest.mark.asyncio
-async def test_proxy_records_token_usage_streaming_anthropic_messages():
-    # The Anthropic shape reports usage across two events without any opt-in field.
+@pytest.mark.parametrize(
+    ("message_delta", "expected"),
+    [
+        (
+            b'data: {"type": "message_delta", "usage": {"output_tokens": 4}}\n\n',
+            {
+                TokenUsageKey.INPUT_TOKENS: 14,
+                TokenUsageKey.OUTPUT_TOKENS: 4,
+                TokenUsageKey.TOTAL_TOKENS: 18,
+                TokenUsageKey.CACHE_READ_INPUT_TOKENS: 2,
+                TokenUsageKey.CACHE_CREATION_INPUT_TOKENS: 3,
+                TokenUsageKey.CACHE_CREATION_INPUT_TOKENS_ABOVE_1HR: 1,
+            },
+        ),
+        # With server tools, message_delta carries the final cumulative input and cache counts.
+        (
+            b'data: {"type": "message_delta", "usage": {"input_tokens": 20, '
+            b'"cache_read_input_tokens": 5, "cache_creation_input_tokens": 3, '
+            b'"output_tokens": 4}}\n\n',
+            {
+                TokenUsageKey.INPUT_TOKENS: 28,
+                TokenUsageKey.OUTPUT_TOKENS: 4,
+                TokenUsageKey.TOTAL_TOKENS: 32,
+                TokenUsageKey.CACHE_READ_INPUT_TOKENS: 5,
+                TokenUsageKey.CACHE_CREATION_INPUT_TOKENS: 3,
+                TokenUsageKey.CACHE_CREATION_INPUT_TOKENS_ABOVE_1HR: 1,
+            },
+        ),
+    ],
+)
+async def test_proxy_records_token_usage_streaming_anthropic_messages(message_delta, expected):
+    # The Anthropic shape reports usage across two events without any opt-in field, and they
+    # arrive in separate chunks, so the counts can only be normalized once the stream ends.
     provider = _make_provider()
     provider._enable_tracing = True
 
-    chunks = [
-        b'data: {"type": "message_start", "message": {"usage": {"input_tokens": 9}}}\n\n',
-        b'data: {"type": "message_delta", "usage": {"output_tokens": 4}}\n\n',
-    ]
+    chunks = [_MESSAGE_START, message_delta]
     with _mock_proxy_request({"is_streaming": True}, *chunks):
         stream = await provider.proxy("v1/messages", {"stream": True})
         assert [chunk async for chunk in stream] == chunks
 
     traces = _traces()
     assert len(traces) == 1
-    usage = traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE)
-    assert usage[TokenUsageKey.INPUT_TOKENS] == 9
-    assert usage[TokenUsageKey.OUTPUT_TOKENS] == 4
-    assert usage[TokenUsageKey.TOTAL_TOKENS] == 13
+    assert traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE) == expected
+
+
+@pytest.mark.asyncio
+async def test_proxy_records_token_usage_streaming_openai_responses():
+    # Cached input is already part of the OpenAI input_tokens, so it must not be folded in again.
+    provider = _make_provider()
+    provider._enable_tracing = True
+
+    chunks = [
+        b'data: {"type": "response.created", "response": {"usage": null}}\n\n',
+        b'data: {"type": "response.completed", "response": {"usage": {"input_tokens": 12, '
+        b'"output_tokens": 8, "total_tokens": 20, "input_tokens_details": '
+        b'{"cached_tokens": 4}}}}\n\n',
+    ]
+    with _mock_proxy_request({"is_streaming": True}, *chunks):
+        stream = await provider.proxy("responses", {"stream": True})
+        assert [chunk async for chunk in stream] == chunks
+
+    traces = _traces()
+    assert len(traces) == 1
+    assert traces[0].data.spans[0].attributes.get(SpanAttributeKey.CHAT_USAGE) == {
+        TokenUsageKey.INPUT_TOKENS: 12,
+        TokenUsageKey.OUTPUT_TOKENS: 8,
+        TokenUsageKey.TOTAL_TOKENS: 20,
+        TokenUsageKey.CACHE_READ_INPUT_TOKENS: 4,
+    }
 
 
 @pytest.mark.asyncio
